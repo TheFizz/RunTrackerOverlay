@@ -3,8 +3,6 @@ name: Publish RunTrackerOverlay
 on:
   push:
     branches: [ "master", "main" ]
-    tags:
-      - "v*.*.*" # Triggers release when you push a tag like v1.0.0
 
 jobs:
   build:
@@ -24,7 +22,7 @@ jobs:
 
     - name: Publish
       # Builds the single-file executable
-      run: dotnet publish RunTrackerOverlay/RunTrackerOverlay.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:ReadyToRun=true -o ./publish
+      run: dotnet publish RunTrackerOverlay/RunTrackerOverlay.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:ReadyToRun=true -o ./publish
 
     - name: Upload Artifact
     # Uploads the exe as a workflow artifact for testing
@@ -32,12 +30,3 @@ jobs:
       with:
         name: RunTrackerOverlay-Windows
         path: ./publish/RunTrackerOverlay.exe
-
-    - name: Create Release
-      # Only runs when a tag (v*.*.*) is pushed
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        files: ./publish/RunTrackerOverlay.exe
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
