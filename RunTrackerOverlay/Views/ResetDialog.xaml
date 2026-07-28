@@ -1,0 +1,31 @@
+﻿<Window x:Class="RunTrackerOverlay.Views.ResetDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Reset Session" Width="300"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="#E0000000"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+    <Border BorderBrush="Gold" BorderThickness="1">
+        <StackPanel Margin="10">
+            <TextBlock Text="Are you sure you want to reset the current session? This will clear all stats and times." 
+                       Foreground="White" 
+                       TextWrapping="Wrap" 
+                       Margin="0,0,0,20"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"/>
+            
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="Yes" Margin="0,0,5,0" IsDefault="True" Click="YesButton_Click"/>
+                <Button Grid.Column="1" Content="No" Margin="5,0,0,0" IsCancel="True" Click="NoButton_Click"/>
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>

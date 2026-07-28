@@ -1,0 +1,78 @@
+﻿<Window x:Class="RunTrackerOverlay.Views.OptionsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Options" Width="300"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="#E0000000"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown"
+        KeyDown="OptionsWindow_KeyDown">
+    <Border BorderBrush="Gold" BorderThickness="1">
+        <StackPanel Margin="10">
+            <CheckBox x:Name="SnappingCheckBox" Content="Enable Snapping" Margin="0,0,0,5" IsChecked="{Binding IsSnappingEnabled}" Foreground="White" HorizontalAlignment="Left"/>
+            <CheckBox x:Name="TooltipCheckBox" Content="Show Keys Tooltip" Margin="0,0,0,5" IsChecked="{Binding ShowKeysTooltip}" Foreground="White" HorizontalAlignment="Left"/>
+            <CheckBox x:Name="ShowSessionNameCheckBox" Content="Show Session Name" Margin="0,0,0,5" IsChecked="{Binding ShowSessionName}" Foreground="White" HorizontalAlignment="Left"/>
+            <CheckBox x:Name="ContinuousCheckBox" Content="Continuous Mode" Margin="0,0,0,5" IsChecked="{Binding IsContinuousMode}" Foreground="White" HorizontalAlignment="Left"/>
+            <CheckBox x:Name="HideMillisecondsCheckBox" Content="Hide Milliseconds" Margin="0,0,0,5" IsChecked="{Binding HideMilliseconds}" Foreground="White" HorizontalAlignment="Left"/>
+
+            <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                <TextBlock Text="Session Name: " Foreground="White" VerticalAlignment="Center"/>
+                <TextBox Text="{Binding SessionName, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="5,0,0,0"/>
+            </StackPanel>
+
+            <TextBlock Text="Show Stats:" Foreground="Gold" Margin="0,5,0,5" FontWeight="Bold"/>
+            <WrapPanel Margin="0,0,0,10">
+                <CheckBox Content="Best" IsChecked="{Binding ShowBest}" Foreground="White" Margin="0,0,10,0"/>
+                <CheckBox Content="Last" IsChecked="{Binding ShowLast}" Foreground="White" Margin="0,0,10,0"/>
+                <CheckBox Content="Worst" IsChecked="{Binding ShowWorst}" Foreground="White" Margin="0,0,10,0"/>
+                <CheckBox Content="Avg" IsChecked="{Binding ShowAvg}" Foreground="White" Margin="0,0,10,0"/>
+                <CheckBox Content="Total" IsChecked="{Binding ShowTotal}" Foreground="White"/>
+            </WrapPanel>
+            
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Run/Pause Key: " VerticalAlignment="Center" Foreground="White"/>
+                <Button Grid.Row="0" Grid.Column="1" x:Name="KeySelectionButton" Content="{Binding ActivationKeyText}" Margin="10,2" Click="KeySelectionButton_Click"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Stop Key: " VerticalAlignment="Center" Foreground="White"/>
+                <Button Grid.Row="1" Grid.Column="1" x:Name="PauseKeySelectionButton" Content="{Binding PauseKeyText}" Margin="10,2" Click="PauseKeySelectionButton_Click"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Focus Key: " VerticalAlignment="Center" Foreground="White"/>
+                <Button Grid.Row="2" Grid.Column="1" x:Name="FocusKeySelectionButton" Content="{Binding FocusKeyText}" Margin="10,2" Click="FocusKeySelectionButton_Click"/>
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Loot Key: " VerticalAlignment="Center" Foreground="White"/>
+                <Button Grid.Row="3" Grid.Column="1" x:Name="LootKeySelectionButton" Content="{Binding LootKeyText}" Margin="10,2" Click="LootKeySelectionButton_Click"/>
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="BG Opacity: " VerticalAlignment="Center" Foreground="White"/>
+                <Slider Grid.Row="4" Grid.Column="1" x:Name="OpacitySlider" Margin="10,2" Minimum="0.0" Maximum="1.0" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding WindowOpacity}"/>
+
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="Text Opacity: " VerticalAlignment="Center" Foreground="White"/>
+                <Slider Grid.Row="5" Grid.Column="1" x:Name="TextOpacitySlider" Margin="10,2" Minimum="0.1" Maximum="1.0" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding TextOpacity}"/>
+            </Grid>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="1" Content="Cancel" Margin="5,0,0,0" IsCancel="True" Click="CancelButton_Click"/>
+                <Button Grid.Column="0" Content="Save" Margin="0,0,5,0" IsDefault="True" Click="SaveButton_Click"/>
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>
