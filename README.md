@@ -76,7 +76,8 @@ Choose to show or hide the following in settings:
     *   **Reset**: Clears session stats and optionally deletes the temporary log.
     *   **Save/Export**: Export data to `.txt`, with filters to include all runs or only those with loot.
     *   **Current Session Log**: The app maintains `currentSession.txt` in the root folder, updated after every run.
-<img width="612" height="475" alt="photo_4_2026-07-30_00-33-59" src="https://github.com/user-attachments/assets/d8ba0366-094d-46db-8b69-01d091e5f48d" />
-<img width="571" height="469" alt="photo_5_2026-07-30_00-33-59" src="https://github.com/user-attachments/assets/22d99ffa-4ce8-41d5-bc4f-a32a65604320" />
-<img width="317" height="396" alt="photo_2_2026-07-30_00-33-59" src="https://github.com/user-attachments/assets/1a5f38fd-c49e-4bb7-926a-a79f641ee7b5" />
-<img width="392" height="312" alt="photo_3_2026-07-30_00-33-59" src="https://github.com/user-attachments/assets/1a215498-2911-4711-93ae-243fc4cbd195" />
+
+| | |
+| :---: | :---: |
+| ![Main Overlay 1](https://github.com/user-attachments/assets/d8ba0366-094d-46db-8b69-01d091e5f48d) | ![Main Overlay 2](https://github.com/user-attachments/assets/22d99ffa-4ce8-41d5-bc4f-a32a65604320) |
+| ![Settings View](https://github.com/user-attachments/assets/1a5f38fd-c49e-4bb7-926a-a79f641ee7b5) | ![Loot Dialog](https://github.com/user-attachments/assets/1a215498-2911-4711-93ae-243fc4cbd195) |
