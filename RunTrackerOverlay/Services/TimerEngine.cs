@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
-
+using System.Globalization;
+using System.Linq;
 using RunTrackerOverlay.ViewModels;
 
 namespace RunTrackerOverlay.Services
@@ -46,6 +47,8 @@ namespace RunTrackerOverlay.Services
         {
             if (string.IsNullOrWhiteSpace(loot)) return;
 
+            loot = ToTitleCase(loot);
+
             if (IsRunning)
             {
                 if (!string.IsNullOrEmpty(_currentLoot))
@@ -62,6 +65,18 @@ namespace RunTrackerOverlay.Services
             {
                 UpdateLastRunLoot(loot);
             }
+        }
+
+        private string ToTitleCase(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return input;
+            
+            var textInfo = CultureInfo.CurrentCulture.TextInfo;
+            // TextInfo.ToTitleCase preserves all-caps words as acronyms, which we don't necessarily want here
+            // but the requirement "item one, item two" -> "Item One, Item Two" suggests basic TitleCase.
+            // If the user inputs "ITEM ONE", it will stay "ITEM ONE" with ToTitleCase.
+            // To truly enforce word by word capitalization as described, we might want to Lower it first.
+            return textInfo.ToTitleCase(input.ToLower());
         }
 
         public void InitializeSessionFile()
