@@ -1,41 +1,28 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
-using RunTrackerOverlay.ViewModels;
 
 namespace RunTrackerOverlay.Services
 {
-    public class TimerEngine : ViewModelBase
+    public class TimerEngine
     {
-        private readonly ISessionLogger _sessionLogger;
-        private int _runCount;
-        private bool _isRunning;
-        private Stopwatch _stopwatch = new Stopwatch();
-        private TimeSpan _accumulatedTime = TimeSpan.Zero;
-        private TimeSpan _lastRunTime = TimeSpan.Zero;
-        private TimeSpan _bestTime = TimeSpan.Zero;
-        private TimeSpan _worstTime = TimeSpan.Zero;
-        private TimeSpan _totalTime = TimeSpan.Zero;
         private bool _isContinuousMode;
+        private readonly Stopwatch _stopwatch = new Stopwatch();
+        private TimeSpan _accumulatedTime = TimeSpan.Zero;
         private string _currentLoot = string.Empty;
 
-        private string _sessionName = string.Empty;
-
-        public int RunCount { get => _runCount; private set => SetProperty(ref _runCount, value); }
-        public bool IsRunning { get => _isRunning; private set => SetProperty(ref _isRunning, value); }
+        public bool IsRunning { get; private set; }
+        public int RunCount { get; private set; }
         public TimeSpan CurrentElapsed => _accumulatedTime + _stopwatch.Elapsed;
-        public TimeSpan BestTime { get => _bestTime; private set => SetProperty(ref _bestTime, value); }
-        public TimeSpan WorstTime { get => _worstTime; private set => SetProperty(ref _worstTime, value); }
-        public TimeSpan TotalTime { get => _totalTime; private set => SetProperty(ref _totalTime, value); }
-        public TimeSpan LastRunTime { get => _lastRunTime; private set => SetProperty(ref _lastRunTime, value); }
-        public string SessionName { get => _sessionName; set => SetProperty(ref _sessionName, value); }
+        public TimeSpan LastRunTime { get; private set; } = TimeSpan.Zero;
+        public string CurrentLoot => _currentLoot;
 
-        public TimerEngine(ISessionLogger sessionLogger, bool isContinuousMode)
+        public event Action<int, TimeSpan, string>? RunCompleted;
+        public event Action<string>? LootAddedToLastRun;
+        public event Action? StateChanged;
+
+        public TimerEngine(bool isContinuousMode)
         {
-            _sessionLogger = sessionLogger;
             _isContinuousMode = isContinuousMode;
-            Reset(true);
         }
 
         public void UpdateSettings(bool isContinuousMode)
@@ -47,7 +34,7 @@ namespace RunTrackerOverlay.Services
         {
             if (string.IsNullOrWhiteSpace(loot)) return;
 
-            loot = ToTitleCase(loot);
+            loot = StringUtils.ToTitleCase(loot);
 
             if (IsRunning)
             {
@@ -59,44 +46,23 @@ namespace RunTrackerOverlay.Services
                 {
                     _currentLoot = loot;
                 }
-                OnPropertyChanged("CurrentLoot");
+                StateChanged?.Invoke();
             }
             else if (RunCount > 0)
             {
-                UpdateLastRunLoot(loot);
+                LootAddedToLastRun?.Invoke(loot);
             }
-        }
-
-        private string ToTitleCase(string input)
-        {
-            if (string.IsNullOrWhiteSpace(input)) return input;
-            
-            var textInfo = CultureInfo.CurrentCulture.TextInfo;
-            // TextInfo.ToTitleCase preserves all-caps words as acronyms, which we don't necessarily want here
-            // but the requirement "item one, item two" -> "Item One, Item Two" suggests basic TitleCase.
-            // If the user inputs "ITEM ONE", it will stay "ITEM ONE" with ToTitleCase.
-            // To truly enforce word by word capitalization as described, we might want to Lower it first.
-            return textInfo.ToTitleCase(input.ToLower());
-        }
-
-        public void InitializeSessionFile()
-        {
-            _sessionLogger.InitializeSession(SessionName, RunCount);
-        }
-
-        private void UpdateLastRunLoot(string loot)
-        {
-            _sessionLogger.UpdateLastRunLoot(loot);
-            OnPropertyChanged("LastRunLoot");
         }
 
         public void StartRun()
         {
+            if (IsRunning) return;
             RunCount++;
             IsRunning = true;
             _accumulatedTime = TimeSpan.Zero;
             _stopwatch.Restart();
             _currentLoot = string.Empty;
+            StateChanged?.Invoke();
         }
 
         public void StopRun()
@@ -108,19 +74,10 @@ namespace RunTrackerOverlay.Services
             _accumulatedTime = _stopwatch.Elapsed;
             _stopwatch.Reset();
             LastRunTime = _accumulatedTime;
-            
-            TotalTime += _accumulatedTime;
-            if (RunCount == 1 || _accumulatedTime < BestTime)
-            {
-                BestTime = _accumulatedTime;
-            }
 
-            if (RunCount == 1 || _accumulatedTime > WorstTime)
-            {
-                WorstTime = _accumulatedTime;
-            }
-
-            SaveRunToSession();
+            var loot = _currentLoot;
+            RunCompleted?.Invoke(RunCount, LastRunTime, loot);
+            StateChanged?.Invoke();
         }
 
         public void HandlePause()
@@ -147,26 +104,15 @@ namespace RunTrackerOverlay.Services
             }
         }
 
-        public void Reset(bool deleteLog = true)
+        public void Reset()
         {
             _stopwatch.Reset();
             IsRunning = false;
             RunCount = 0;
             _accumulatedTime = TimeSpan.Zero;
             LastRunTime = TimeSpan.Zero;
-            BestTime = TimeSpan.Zero;
-            WorstTime = TimeSpan.Zero;
-            TotalTime = TimeSpan.Zero;
-
-            if (deleteLog)
-            {
-                InitializeSessionFile();
-            }
-        }
-
-        private void SaveRunToSession()
-        {
-            _sessionLogger.AppendRun(RunCount, LastRunTime, _currentLoot);
+            _currentLoot = string.Empty;
+            StateChanged?.Invoke();
         }
     }
 }

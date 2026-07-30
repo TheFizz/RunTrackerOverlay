@@ -28,9 +28,8 @@ namespace RunTrackerOverlay.Views
             IHotkeyCoordinator hotkeyCoordinator = new HotkeyCoordinator();
 
             AppSettings settings = settingsProvider.LoadSettings();
-            TimerEngine timerEngine = new TimerEngine(sessionLogger, settings.IsContinuousMode);
-            timerEngine.SessionName = settings.SessionName;
-            timerEngine.InitializeSessionFile();
+            TimerEngine timerEngine = new TimerEngine(settings.IsContinuousMode);
+            sessionLogger.InitializeSession(settings.SessionName, 0);
 
             RunTrackerOverlay.ViewModels.MainViewModel viewModel = new RunTrackerOverlay.ViewModels.MainViewModel(timerEngine, settings, sessionLogger, reportExporter);
 

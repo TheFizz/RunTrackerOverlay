@@ -9,6 +9,7 @@ namespace RunTrackerOverlay.ViewModels
     public class MainViewModel : ViewModelBase
     {
         private readonly TimerEngine _timerEngine;
+        private readonly StatisticsTracker _statsTracker = new StatisticsTracker();
         private readonly AppSettings _settings;
         private readonly ISessionLogger _sessionLogger;
         private readonly IReportExporter _reportExporter;
@@ -35,16 +36,20 @@ namespace RunTrackerOverlay.ViewModels
         private bool _showSessionName = true;
         private bool _isActive;
         private bool _hideMilliseconds;
+        private bool _isDirty;
+        private bool _isDialogOpen;
 
         public Func<string, (bool? result, bool? includeEmpty)>? RequestSaveDialog { get; set; }
-        public Func<bool?>? RequestResetDialog { get; set; }
+        public Func<string, string, bool?>? RequestConfirmation { get; set; }
         public Func<bool?>? RequestOptionsDialog { get; set; }
         public Action<string, string>? ShowMessage { get; set; }
         public Action<string, string>? ShowError { get; set; }
+        public Action? RequestClose { get; set; }
 
         public ICommand SaveCommand { get; private set; }
         public ICommand ResetCommand { get; private set; }
         public ICommand OptionsCommand { get; private set; }
+        public ICommand CloseCommand { get; private set; }
         
         public MainViewModel(TimerEngine timerEngine, AppSettings settings, ISessionLogger sessionLogger, IReportExporter reportExporter)
         {
@@ -52,11 +57,26 @@ namespace RunTrackerOverlay.ViewModels
             _settings = settings;
             _sessionLogger = sessionLogger;
             _reportExporter = reportExporter;
-            _timerEngine.PropertyChanged += TimerEngine_PropertyChanged;
+            
+            _timerEngine.StateChanged += () => UpdateDisplay();
+            _timerEngine.RunCompleted += (count, duration, loot) =>
+            {
+                _statsTracker.AddRun(duration);
+                _sessionLogger.AppendRun(count, duration, loot);
+                IsDirty = true;
+                UpdateDisplay();
+            };
+            _timerEngine.LootAddedToLastRun += (loot) =>
+            {
+                _sessionLogger.UpdateLastRunLoot(loot);
+                IsDirty = true;
+                UpdateDisplay();
+            };
 
             SaveCommand = new RelayCommand(_ => ExecuteSave());
             ResetCommand = new RelayCommand(_ => ExecuteReset());
             OptionsCommand = new RelayCommand(_ => ExecuteOptions());
+            CloseCommand = new RelayCommand(_ => RequestClose?.Invoke());
 
             UpdateDisplay();
             UpdateTooltip();
@@ -151,6 +171,8 @@ namespace RunTrackerOverlay.ViewModels
         public bool ShowStats => ShowBest || ShowLast || ShowWorst || ShowAvg || ShowTotal;
 
         public bool IsActive { get => _isActive; set => SetProperty(ref _isActive, value); }
+        public bool IsDirty { get => _isDirty; set => SetProperty(ref _isDirty, value); }
+        public bool IsDialogOpen { get => _isDialogOpen; set => SetProperty(ref _isDialogOpen, value); }
         public bool HideMilliseconds
         {
             get => _hideMilliseconds;
@@ -168,6 +190,10 @@ namespace RunTrackerOverlay.ViewModels
 
         private void TimerEngine_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == "CurrentLoot" || e.PropertyName == "RunCount" || e.PropertyName == "TotalTime" || e.PropertyName == "LastRunLoot")
+            {
+                IsDirty = true;
+            }
             UpdateDisplay();
         }
 
@@ -191,11 +217,11 @@ namespace RunTrackerOverlay.ViewModels
         {
             if (_settings.IsContinuousMode)
             {
-                TooltipText = $"Run: {_settings.ActivationKey}, Stop: {_settings.PauseKey}, Loot: {_settings.LootKey}, Focus: {_settings.FocusKey}";
+                TooltipText = $"Run: {_settings.ActivationKey}\nStop: {_settings.PauseKey}\nLoot: {_settings.LootKey}\nFocus: {_settings.FocusKey}";
             }
             else
             {
-                TooltipText = $"Run/Stop: {_settings.ActivationKey}, Loot: {_settings.LootKey}, Focus: {_settings.FocusKey}";
+                TooltipText = $"Run/Stop: {_settings.ActivationKey}\nLoot: {_settings.LootKey}\nFocus: {_settings.FocusKey}";
             }
             ShowTooltip = _settings.ShowKeysTooltip;
         }
@@ -203,7 +229,7 @@ namespace RunTrackerOverlay.ViewModels
         public void UpdateDisplay()
         {
             TimeSpan elapsed = _timerEngine.CurrentElapsed;
-            TimerText = FormatTime(elapsed);
+            TimerText = TimeUtils.FormatTime(elapsed, HideMilliseconds);
 
             if (_timerEngine.IsRunning)
             {
@@ -230,30 +256,32 @@ namespace RunTrackerOverlay.ViewModels
                 }
             }
 
-            BestTimeText = FormatTime(_timerEngine.BestTime);
-            WorstTimeText = FormatTime(_timerEngine.WorstTime);
-            LastRunTimeText = FormatTime(_timerEngine.LastRunTime);
+            BestTimeText = TimeUtils.FormatTime(_statsTracker.BestTime, HideMilliseconds);
+            WorstTimeText = TimeUtils.FormatTime(_statsTracker.WorstTime, HideMilliseconds);
+            LastRunTimeText = TimeUtils.FormatTime(_timerEngine.LastRunTime, HideMilliseconds);
             
-            TimeSpan totalForAverage = _timerEngine.TotalTime;
-            int divisor = _timerEngine.RunCount;
-            
-            if (_timerEngine.IsRunning)
-            {
-                divisor--;
-            }
-
-            TimeSpan averageTime = divisor > 0 
-                ? TimeSpan.FromTicks(totalForAverage.Ticks / divisor) 
-                : TimeSpan.Zero;
-            AverageTimeText = FormatTime(averageTime);
-            TotalTimeText = FormatTime(_timerEngine.TotalTime);
+            AverageTimeText = TimeUtils.FormatTime(_statsTracker.RunCount > 0 
+                ? TimeSpan.FromTicks(_statsTracker.TotalTime.Ticks / _statsTracker.RunCount) 
+                : TimeSpan.Zero, HideMilliseconds);
+            TotalTimeText = TimeUtils.FormatTime(_statsTracker.TotalTime, HideMilliseconds);
         }
 
         private void ExecuteReset()
         {
-            if (RequestResetDialog?.Invoke() == true)
+            IsDialogOpen = true;
+            try
             {
-                _timerEngine.Reset();
+                if (RequestConfirmation?.Invoke("Are you sure you want to reset the current session? This will clear all loot and times.", "Reset Session") == true)
+                {
+                    _timerEngine.Reset();
+                    _statsTracker.Reset();
+                    _sessionLogger.InitializeSession(SessionName, 0);
+                    IsDirty = false;
+                }
+            }
+            finally
+            {
+                IsDialogOpen = false;
             }
         }
 
@@ -263,22 +291,30 @@ namespace RunTrackerOverlay.ViewModels
 
         private void ExecuteOptions()
         {
-            OptionsRequested?.Invoke();
-            if (RequestOptionsDialog?.Invoke() == true)
+            IsDialogOpen = true;
+            try
             {
-                _timerEngine.UpdateSettings(_settings.IsContinuousMode);
-                _timerEngine.SessionName = _settings.SessionName;
-                _timerEngine.InitializeSessionFile();
-                UpdateVisuals();
-                UpdateTooltip();
-                UpdateDisplay();
-                SettingsChanged?.Invoke();
+                OptionsRequested?.Invoke();
+                if (RequestOptionsDialog?.Invoke() == true)
+                {
+                    _timerEngine.UpdateSettings(_settings.IsContinuousMode);
+                    _sessionLogger.InitializeSession(_settings.SessionName, _timerEngine.RunCount);
+                    UpdateVisuals();
+                    UpdateTooltip();
+                    UpdateDisplay();
+                    SettingsChanged?.Invoke();
+                }
+                OptionsClosed?.Invoke();
             }
-            OptionsClosed?.Invoke();
+            finally
+            {
+                IsDialogOpen = false;
+            }
         }
 
         private void ExecuteSave()
         {
+            IsDialogOpen = true;
             try
             {
                 string filename = $"{SessionName}.txt";
@@ -287,6 +323,14 @@ namespace RunTrackerOverlay.ViewModels
                 var dialogResult = RequestSaveDialog?.Invoke(filename);
                 if (dialogResult?.result == true)
                 {
+                    if (System.IO.File.Exists(filename))
+                    {
+                        if (RequestConfirmation?.Invoke($"File '{filename}' already exists. Overwrite?", "Overwrite Confirmation") != true)
+                        {
+                            return;
+                        }
+                    }
+
                     bool includeRunsWithoutLoot = dialogResult?.includeEmpty ?? true;
 
                     string header = $"Session: {SessionName}{Environment.NewLine}" +
@@ -299,6 +343,7 @@ namespace RunTrackerOverlay.ViewModels
                                      $"Date: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
 
                     _reportExporter.SaveSessionToFile(filename, header, includeRunsWithoutLoot, _sessionLogger);
+                    IsDirty = false;
                     ShowMessage?.Invoke($"Stats saved to {filename}", "Success");
                 }
             }
@@ -306,22 +351,11 @@ namespace RunTrackerOverlay.ViewModels
             {
                 ShowError?.Invoke($"Error saving stats: {ex.Message}", "Error");
             }
-        }
-
-        private string FormatTime(TimeSpan ts)
-        {
-            if (ts == TimeSpan.Zero || ts.TotalDays >= 1)
+            finally
             {
-                if (ts.TotalDays >= 1)
-                {
-                    return HideMilliseconds ? "99:59" : "99:59.99";
-                }
-                return HideMilliseconds ? "00:00" : "00:00.00";
+                IsDialogOpen = false;
             }
-
-            return HideMilliseconds 
-                ? ts.ToString(@"mm\:ss") 
-                : ts.ToString(@"mm\:ss\.ff");
         }
+
     }
 }

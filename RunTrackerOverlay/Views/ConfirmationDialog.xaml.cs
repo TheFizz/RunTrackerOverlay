@@ -3,11 +3,13 @@ using System.Windows.Input;
 
 namespace RunTrackerOverlay.Views
 {
-    public partial class ResetDialog : Window
+    public partial class ConfirmationDialog : Window
     {
-        public ResetDialog()
+        public ConfirmationDialog(string message, string title = "Confirmation")
         {
             InitializeComponent();
+            this.Title = title;
+            MessageText.Text = message;
         }
 
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

@@ -1,0 +1,32 @@
+﻿<Window x:Class="RunTrackerOverlay.Views.MessageDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Message" Width="200"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="#E0000000"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+    <Border BorderBrush="Gold" BorderThickness="1">
+        <StackPanel Margin="10">
+            <TextBlock x:Name="TitleText" 
+                       Text="Message" 
+                       Foreground="Gold" 
+                       FontSize="14" 
+                       FontWeight="Bold" 
+                       HorizontalAlignment="Center" 
+                       Margin="0,0,0,10"/>
+            <TextBlock x:Name="MessageText" 
+                       Text="Message content goes here." 
+                       Foreground="White" 
+                       TextWrapping="Wrap" 
+                       Margin="0,0,0,10"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"/>
+            
+            <Button Content="OK" HorizontalAlignment="Center" Width="80" IsDefault="True" Click="OkButton_Click"/>
+        </StackPanel>
+    </Border>
+</Window>

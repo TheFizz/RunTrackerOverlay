@@ -33,6 +33,7 @@ namespace RunTrackerOverlay.Views
         private int _mouseOffsetY;
         private bool _isDragging;
         private bool _isLootDialogOpen;
+        private bool _isUpdatingPosition;
 
         public MainWindow(
             MainViewModel viewModel,
@@ -56,20 +57,20 @@ namespace RunTrackerOverlay.Views
 
             DataContext = _viewModel;
 
-            _viewModel.RequestSaveDialog = (filename) =>
+            _viewModel.RequestSaveDialog = (filename) => ShowDialogWithState(() =>
             {
                 SaveDialog saveDialog = new SaveDialog(filename) { Owner = this };
                 bool? result = saveDialog.ShowDialog();
                 return (result, saveDialog.IncludeEmpty);
-            };
+            });
 
-            _viewModel.RequestResetDialog = () =>
+            _viewModel.RequestConfirmation = (message, title) => ShowDialogWithState(() =>
             {
-                ResetDialog resetDialog = new ResetDialog { Owner = this };
-                return resetDialog.ShowDialog();
-            };
+                ConfirmationDialog confirmDialog = new ConfirmationDialog(message, title) { Owner = this };
+                return confirmDialog.ShowDialog();
+            });
 
-            _viewModel.RequestOptionsDialog = () =>
+            _viewModel.RequestOptionsDialog = () => ShowDialogWithState(() =>
             {
                 OptionsWindow optionsWin = new OptionsWindow((RunTrackerOverlay.Models.AppSettings)_settings) { Owner = this };
 
@@ -97,8 +98,7 @@ namespace RunTrackerOverlay.Views
                     SyncSettings();
                     optionsWin.ViewModel.ApplyTo(_settings);
                     _timerEngine.UpdateSettings(_settings.IsContinuousMode);
-                    _timerEngine.SessionName = _settings.SessionName;
-                    _timerEngine.InitializeSessionFile();
+                    _sessionLogger.InitializeSession(_settings.SessionName, _timerEngine.RunCount);
                     _hotkeyCoordinator.UpdateSettings(_settings);
                     ApplySettings(updatePosition: false);
                     _settingsProvider.SaveSettings(_settings);
@@ -116,14 +116,24 @@ namespace RunTrackerOverlay.Views
                 }
 
                 return result;
-            };
+            });
 
             _viewModel.OptionsRequested = () => _hotkeyCoordinator.IsPaused = true;
             _viewModel.OptionsClosed = () => _hotkeyCoordinator.IsPaused = false;
             _viewModel.SettingsChanged = () => ApplySettings(updatePosition: false);
+            _viewModel.RequestClose = () => Close();
 
-            _viewModel.ShowMessage = (msg, title) => MessageBox.Show(this, msg, title, MessageBoxButton.OK, MessageBoxImage.Information);
-            _viewModel.ShowError = (msg, title) => MessageBox.Show(this, msg, title, MessageBoxButton.OK, MessageBoxImage.Error);
+            _viewModel.ShowMessage = (msg, title) => ShowDialogWithState(() =>
+            {
+                MessageDialog msgDialog = new MessageDialog(msg, title) { Owner = this };
+                return msgDialog.ShowDialog();
+            });
+
+            _viewModel.ShowError = (msg, title) => ShowDialogWithState(() =>
+            {
+                MessageDialog msgDialog = new MessageDialog(msg, title, isError: true) { Owner = this };
+                return msgDialog.ShowDialog();
+            });
 
             _hotkeyCoordinator.Initialize(
                 _settings, 
@@ -131,8 +141,24 @@ namespace RunTrackerOverlay.Views
                 () => Dispatcher.BeginInvoke(new Action(ShowLootDialog)), 
                 () => Dispatcher.BeginInvoke(new Action(() => _windowController.ActivateWindow(this))));
 
-            Activated += (s, e) => { _viewModel.IsActive = true; ApplySettings(false); };
-            Deactivated += (s, e) => { _viewModel.IsActive = false; ApplySettings(false); };
+            Activated += (s, e) => 
+            { 
+                if (!_viewModel.IsDialogOpen)
+                {
+                    _viewModel.IsActive = true; 
+                    ApplySettings(false); 
+                }
+            };
+            Deactivated += (s, e) => 
+            { 
+                if (!_viewModel.IsDialogOpen)
+                {
+                    _viewModel.IsActive = false; 
+                    ApplySettings(false); 
+                }
+            };
+
+            SizeChanged += MainWindow_SizeChanged;
 
             _displayTimer = new DispatcherTimer(DispatcherPriority.Render);
             _displayTimer.Interval = TimeSpan.FromMilliseconds(10);
@@ -189,22 +215,89 @@ namespace RunTrackerOverlay.Views
             _windowController.SetClickThrough(this, !_viewModel.IsActive);
         }
 
+        private T ShowDialogWithState<T>(Func<T> dialogAction)
+        {
+            _viewModel.IsDialogOpen = true;
+            try
+            {
+                return dialogAction();
+            }
+            finally
+            {
+                _viewModel.IsDialogOpen = false;
+            }
+        }
+
         private void SyncSettings()
         {
             _settings.WindowLeft = this.Left;
             _settings.WindowTop = this.Top;
         }
 
-        private void OptionsLink_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            e.Handled = true;
-            _viewModel.OptionsCommand.Execute(null);
+            if (_viewModel.IsDirty)
+            {
+                _viewModel.IsDialogOpen = true;
+                try
+                {
+                    if (_viewModel.RequestConfirmation?.Invoke("You have unsaved changes. Quit anyway?", "Quit Without Saving") != true)
+                    {
+                        e.Cancel = true;
+                    }
+                }
+                finally
+                {
+                    _viewModel.IsDialogOpen = false;
+                }
+            }
         }
 
-        private void CloseLink_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            e.Handled = true;
-            Close();
+            if (_isDragging || _isUpdatingPosition || !_settings.IsSnappingEnabled) return;
+
+            var screen = System.Windows.Forms.Screen.FromHandle(new WindowInteropHelper(this).Handle);
+            var area = screen.WorkingArea;
+            int snapDistance = RunTrackerOverlay.Models.Constants.SnapDistance;
+
+            bool needsAdjustment = false;
+            double newLeft = this.Left;
+            double newTop = this.Top;
+
+            // Check if we were snapped to top
+            if (Math.Abs(this.Top - area.Top) < snapDistance)
+            {
+                newTop = area.Top;
+                needsAdjustment = true;
+            }
+            // Check if we were snapped to bottom
+            else if (Math.Abs((this.Top + e.PreviousSize.Height) - area.Bottom) < snapDistance)
+            {
+                newTop = area.Bottom - e.NewSize.Height;
+                needsAdjustment = true;
+            }
+
+            // Check if we were snapped to left
+            if (Math.Abs(this.Left - area.Left) < snapDistance)
+            {
+                newLeft = area.Left;
+                needsAdjustment = true;
+            }
+            // Check if we were snapped to right
+            else if (Math.Abs((this.Left + e.PreviousSize.Width) - area.Right) < snapDistance)
+            {
+                newLeft = area.Right - e.NewSize.Width;
+                needsAdjustment = true;
+            }
+
+            if (needsAdjustment)
+            {
+                _isUpdatingPosition = true;
+                this.Left = newLeft;
+                this.Top = newTop;
+                _isUpdatingPosition = false;
+            }
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -225,6 +318,7 @@ namespace RunTrackerOverlay.Views
         {
             if (_isLootDialogOpen) return;
             _isLootDialogOpen = true;
+            _viewModel.IsDialogOpen = true;
 
             _hotkeyCoordinator.IsPaused = true;
 
@@ -250,6 +344,7 @@ namespace RunTrackerOverlay.Views
             finally
             {
                 _isLootDialogOpen = false;
+                _viewModel.IsDialogOpen = false;
                 _hotkeyCoordinator.IsPaused = false;
             }
         }
