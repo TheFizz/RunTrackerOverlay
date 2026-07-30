@@ -1,3 +1,9 @@
+### Required components
+
+You will need to install **.NET Desktop Runtime 9.x.x**. You can grab it here: https://dotnet.microsoft.com/en-us/download/dotnet/9.0
+
+---
+
 ### RunTrackerOverlay
 
 `RunTrackerOverlay` is a lightweight, customizable WPF application designed to track run times and loot drops in real-time via a transparent overlay.
