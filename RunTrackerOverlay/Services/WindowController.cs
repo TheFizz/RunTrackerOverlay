@@ -61,7 +61,7 @@ namespace RunTrackerOverlay.Services
             }
             else if (msg == NativeMethods.WM_MOVING && isDragging && settings.IsSnappingEnabled)
             {
-                NativeMethods.RECT rect = (NativeMethods.RECT)System.Runtime.InteropServices.Marshal.PtrToStructure(lParam, typeof(NativeMethods.RECT));
+                NativeMethods.RECT rect = (NativeMethods.RECT)System.Runtime.InteropServices.Marshal.PtrToStructure(lParam, typeof(NativeMethods.RECT))!;
                 NativeMethods.GetCursorPos(out NativeMethods.POINT pt);
                 virtualLeft = pt.X - mouseOffsetX;
                 virtualTop = pt.Y - mouseOffsetY;

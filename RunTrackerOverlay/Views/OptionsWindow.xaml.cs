@@ -9,11 +9,13 @@ namespace RunTrackerOverlay.Views
 {
     public partial class OptionsWindow : Window
     {
+        private readonly AppSettings _settings;
         public OptionsViewModel ViewModel { get; }
 
         public OptionsWindow(AppSettings settings)
         {
             InitializeComponent();
+            _settings = settings;
             ViewModel = new OptionsViewModel(settings);
             DataContext = ViewModel;
         }
@@ -60,6 +62,7 @@ namespace RunTrackerOverlay.Views
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
+            ViewModel.ApplyTo(_settings);
             DialogResult = true;
             Close();
         }

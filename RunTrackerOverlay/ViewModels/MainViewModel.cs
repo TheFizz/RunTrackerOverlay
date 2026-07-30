@@ -16,7 +16,7 @@ namespace RunTrackerOverlay.ViewModels
         private readonly IReportExporter _reportExporter;
         private readonly ISettingsProvider _settingsProvider;
         private readonly IHotkeyCoordinator _hotkeyCoordinator;
-        private IDialogService _dialogService;
+        private IDialogService _dialogService = null!;
         private string _timerText = "00:00.00";
         private string _runStatusSymbol = "■";
         private string _runLabelText = " Run #1";
@@ -326,7 +326,15 @@ namespace RunTrackerOverlay.ViewModels
             _hotkeyCoordinator.IsPaused = true;
             try
             {
-                if (_dialogService.ShowOptionsDialog(_settings) == true)
+                if (_dialogService.ShowOptionsDialog(_settings, vm => 
+                    {
+                        vm.ApplyTo(_settings);
+                        _timerEngine.UpdateSettings(_settings.IsContinuousMode);
+                        UpdateVisuals();
+                        UpdateTooltip();
+                        UpdateDisplay();
+                        _hotkeyCoordinator.UpdateSettings(_settings);
+                    }) == true)
                 {
                     _timerEngine.UpdateSettings(_settings.IsContinuousMode);
                     _sessionLogger.InitializeSession(_settings.SessionName, _timerEngine.RunCount);
