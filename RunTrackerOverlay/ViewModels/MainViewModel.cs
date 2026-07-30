@@ -9,10 +9,14 @@ namespace RunTrackerOverlay.ViewModels
     public class MainViewModel : ViewModelBase
     {
         private readonly TimerEngine _timerEngine;
+        public TimerEngine TimerEngine => _timerEngine;
         private readonly StatisticsTracker _statsTracker = new StatisticsTracker();
         private readonly AppSettings _settings;
         private readonly ISessionLogger _sessionLogger;
         private readonly IReportExporter _reportExporter;
+        private readonly ISettingsProvider _settingsProvider;
+        private readonly IHotkeyCoordinator _hotkeyCoordinator;
+        private IDialogService _dialogService;
         private string _timerText = "00:00.00";
         private string _runStatusSymbol = "■";
         private string _runLabelText = " Run #1";
@@ -38,25 +42,63 @@ namespace RunTrackerOverlay.ViewModels
         private bool _hideMilliseconds;
         private bool _isDirty;
         private bool _isDialogOpen;
+        private double _windowLeft;
+        private double _windowTop;
+        private bool _isLootDialogOpen;
 
-        public Func<string, (bool? result, bool? includeEmpty)>? RequestSaveDialog { get; set; }
-        public Func<string, string, bool?>? RequestConfirmation { get; set; }
-        public Func<bool?>? RequestOptionsDialog { get; set; }
-        public Action<string, string>? ShowMessage { get; set; }
-        public Action<string, string>? ShowError { get; set; }
+        public IDialogService DialogService { get => _dialogService; set => _dialogService = value; }
+
+        public double WindowLeft
+        {
+            get => _windowLeft;
+            set => SetProperty(ref _windowLeft, value);
+        }
+
+        public double WindowTop
+        {
+            get => _windowTop;
+            set => SetProperty(ref _windowTop, value);
+        }
+
         public Action? RequestClose { get; set; }
 
         public ICommand SaveCommand { get; private set; }
         public ICommand ResetCommand { get; private set; }
         public ICommand OptionsCommand { get; private set; }
         public ICommand CloseCommand { get; private set; }
+
+        public void ShowLootDialog()
+        {
+            if (_isLootDialogOpen) return;
+            _isLootDialogOpen = true;
+
+            try
+            {
+                _hotkeyCoordinator.IsPaused = true;
+                string? loot = _dialogService.ShowLootDialog();
+                if (loot != null)
+                {
+                    _timerEngine.AddLoot(loot);
+                }
+            }
+            finally
+            {
+                _isLootDialogOpen = false;
+                _hotkeyCoordinator.IsPaused = false;
+            }
+        }
         
-        public MainViewModel(TimerEngine timerEngine, AppSettings settings, ISessionLogger sessionLogger, IReportExporter reportExporter)
+        public MainViewModel(TimerEngine timerEngine, AppSettings settings, ISessionLogger sessionLogger, IReportExporter reportExporter, ISettingsProvider settingsProvider, IHotkeyCoordinator hotkeyCoordinator)
         {
             _timerEngine = timerEngine;
             _settings = settings;
             _sessionLogger = sessionLogger;
             _reportExporter = reportExporter;
+            _settingsProvider = settingsProvider;
+            _hotkeyCoordinator = hotkeyCoordinator;
+
+            WindowLeft = _settings.WindowLeft;
+            WindowTop = _settings.WindowTop;
             
             _timerEngine.StateChanged += () => UpdateDisplay();
             _timerEngine.RunCompleted += (count, duration, loot) =>
@@ -268,70 +310,69 @@ namespace RunTrackerOverlay.ViewModels
 
         private void ExecuteReset()
         {
-            IsDialogOpen = true;
-            try
+            if (_dialogService.ShowConfirmationDialog("Are you sure you want to reset the current session? This will clear all loot and times.", "Reset Session") == true)
             {
-                if (RequestConfirmation?.Invoke("Are you sure you want to reset the current session? This will clear all loot and times.", "Reset Session") == true)
-                {
-                    _timerEngine.Reset();
-                    _statsTracker.Reset();
-                    _sessionLogger.InitializeSession(SessionName, 0);
-                    IsDirty = false;
-                }
-            }
-            finally
-            {
-                IsDialogOpen = false;
+                _timerEngine.Reset();
+                _statsTracker.Reset();
+                _sessionLogger.InitializeSession(SessionName, 0);
+                IsDirty = false;
             }
         }
 
         public Action? SettingsChanged;
-        public Action? OptionsRequested;
-        public Action? OptionsClosed;
 
         private void ExecuteOptions()
         {
-            IsDialogOpen = true;
+            _hotkeyCoordinator.IsPaused = true;
             try
             {
-                OptionsRequested?.Invoke();
-                if (RequestOptionsDialog?.Invoke() == true)
+                if (_dialogService.ShowOptionsDialog(_settings) == true)
                 {
                     _timerEngine.UpdateSettings(_settings.IsContinuousMode);
                     _sessionLogger.InitializeSession(_settings.SessionName, _timerEngine.RunCount);
                     UpdateVisuals();
                     UpdateTooltip();
                     UpdateDisplay();
-                    SettingsChanged?.Invoke();
+                    _hotkeyCoordinator.UpdateSettings(_settings);
+                    _settingsProvider.SaveSettings(_settings);
                 }
-                OptionsClosed?.Invoke();
+                else
+                {
+                    var loaded = _settingsProvider.LoadSettings();
+                    _settings.CopyFrom(loaded);
+                    _settings.WindowLeft = WindowLeft;
+                    _settings.WindowTop = WindowTop;
+                    _hotkeyCoordinator.UpdateSettings(_settings);
+                    UpdateVisuals();
+                    UpdateTooltip();
+                    UpdateDisplay();
+                }
             }
             finally
             {
-                IsDialogOpen = false;
+                _hotkeyCoordinator.IsPaused = false;
             }
         }
 
         private void ExecuteSave()
         {
-            IsDialogOpen = true;
             try
             {
                 string filename = $"{SessionName}.txt";
                 if (string.IsNullOrWhiteSpace(SessionName)) filename = "Session.txt";
 
-                var dialogResult = RequestSaveDialog?.Invoke(filename);
-                if (dialogResult?.result == true)
+                var dialogResult = _dialogService.ShowSaveDialog(filename);
+                if (dialogResult.result == true)
                 {
                     if (System.IO.File.Exists(filename))
                     {
-                        if (RequestConfirmation?.Invoke($"File '{filename}' already exists. Overwrite?", "Overwrite Confirmation") != true)
+                        if (_dialogService.ShowConfirmationDialog($"File '{filename}' already exists. Overwrite?", "Overwrite Confirmation") != true)
                         {
                             return;
                         }
                     }
 
-                    bool includeRunsWithoutLoot = dialogResult?.includeEmpty ?? true;
+                    bool includeRunsWithoutLoot = dialogResult.includeEmpty ?? true;
 
                     string header = $"Session: {SessionName}{Environment.NewLine}" +
                                      $"Runs: {_timerEngine.RunCount}{Environment.NewLine}" +
@@ -344,16 +385,12 @@ namespace RunTrackerOverlay.ViewModels
 
                     _reportExporter.SaveSessionToFile(filename, header, includeRunsWithoutLoot, _sessionLogger);
                     IsDirty = false;
-                    ShowMessage?.Invoke($"Stats saved to {filename}", "Success");
+                    _dialogService.ShowMessage($"Stats saved to {filename}", "Success");
                 }
             }
             catch (Exception ex)
             {
-                ShowError?.Invoke($"Error saving stats: {ex.Message}", "Error");
-            }
-            finally
-            {
-                IsDialogOpen = false;
+                _dialogService.ShowError($"Error saving stats: {ex.Message}", "Error");
             }
         }
 

@@ -8,6 +8,8 @@
         WindowStyle="None" 
         AllowsTransparency="True" 
         Background="{Binding BackgroundBrush}"
+        Left="{Binding WindowLeft, Mode=TwoWay}"
+        Top="{Binding WindowTop, Mode=TwoWay}"
         MouseLeftButtonDown="Window_MouseLeftButtonDown"
         Closing="Window_Closing">
     <Window.Resources>

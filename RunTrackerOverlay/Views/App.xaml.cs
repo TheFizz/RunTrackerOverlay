@@ -31,15 +31,15 @@ namespace RunTrackerOverlay.Views
             TimerEngine timerEngine = new TimerEngine(settings.IsContinuousMode);
             sessionLogger.InitializeSession(settings.SessionName, 0);
 
-            RunTrackerOverlay.ViewModels.MainViewModel viewModel = new RunTrackerOverlay.ViewModels.MainViewModel(timerEngine, settings, sessionLogger, reportExporter);
+            RunTrackerOverlay.ViewModels.MainViewModel viewModel = new RunTrackerOverlay.ViewModels.MainViewModel(timerEngine, settings, sessionLogger, reportExporter, settingsProvider, hotkeyCoordinator);
+            IDialogService dialogService = new DialogService(viewModel, windowController);
+            viewModel.DialogService = dialogService;
 
             MainWindow mainWindow = new MainWindow(
                 viewModel, 
                 settings, 
-                timerEngine, 
-                sessionLogger, 
+                sessionLogger,
                 settingsProvider, 
-                reportExporter, 
                 windowController, 
                 hotkeyCoordinator);
 
