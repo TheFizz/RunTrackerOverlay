@@ -21,6 +21,10 @@ namespace RunTrackerOverlay.Services
 
         public const int WH_KEYBOARD_LL = 13;
 
+        public const uint WM_ACTIVATE = 0x0006;
+        public const uint WM_NCACTIVATE = 0x0086;
+        public const int WA_INACTIVE = 0;
+
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT
         {
@@ -45,21 +49,22 @@ namespace RunTrackerOverlay.Services
 
         [DllImport("user32.dll")]
         public static extern bool SetForegroundWindow(IntPtr hWnd);
-
-        [DllImport("user32.dll")]
-        public static extern IntPtr GetForegroundWindow();
-
         [DllImport("user32.dll")]
         public static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr ProcessId);
-
+        
         [DllImport("user32.dll")]
         public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+        
+        [DllImport("user32.dll")]
+        public static extern bool BringWindowToTop(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         public static extern IntPtr SetFocus(IntPtr hWnd);
 
         [DllImport("kernel32.dll")]
         public static extern uint GetCurrentThreadId();
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
 
         [DllImport("user32.dll")]
         public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);

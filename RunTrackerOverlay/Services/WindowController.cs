@@ -20,20 +20,22 @@ namespace RunTrackerOverlay.Services
         {
             IntPtr handle = new WindowInteropHelper(window).Handle;
             int extendedStyle = NativeMethods.GetWindowLong(handle, NativeMethods.GWL_EXSTYLE);
-            if (clickThrough)
+            int newStyle = clickThrough 
+                ? (extendedStyle | NativeMethods.WS_EX_TRANSPARENT) 
+                : (extendedStyle & ~NativeMethods.WS_EX_TRANSPARENT);
+
+            if (extendedStyle != newStyle)
             {
-                NativeMethods.SetWindowLong(handle, NativeMethods.GWL_EXSTYLE, extendedStyle | NativeMethods.WS_EX_TRANSPARENT);
-            }
-            else
-            {
-                NativeMethods.SetWindowLong(handle, NativeMethods.GWL_EXSTYLE, extendedStyle & ~NativeMethods.WS_EX_TRANSPARENT);
+                NativeMethods.SetWindowLong(handle, NativeMethods.GWL_EXSTYLE, newStyle);
             }
         }
 
         public void ActivateWindow(Window window)
         {
             IntPtr handle = new WindowInteropHelper(window).Handle;
+            
             NativeMethods.SetForegroundWindow(handle);
+            NativeMethods.BringWindowToTop(handle);
             window.Activate();
         }
 

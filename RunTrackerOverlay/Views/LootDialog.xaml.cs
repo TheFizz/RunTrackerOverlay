@@ -44,7 +44,6 @@ namespace RunTrackerOverlay.Views
         private void ForceForeground()
         {
             var handle = new WindowInteropHelper(this).Handle;
-            
             // Get the current foreground window and its thread ID
             IntPtr foregroundWindow = NativeMethods.GetForegroundWindow();
             if (foregroundWindow == handle)
@@ -76,6 +75,8 @@ namespace RunTrackerOverlay.Views
             
             // Also try to set focus directly via API
             NativeMethods.SetFocus(handle);
+            NativeMethods.SetForegroundWindow(handle);
+            this.Activate();
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
