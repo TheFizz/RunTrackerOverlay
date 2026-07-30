@@ -32,27 +32,39 @@ namespace RunTrackerOverlay.Services
 
         public void ActivateWindow(Window window)
         {
-            IntPtr handle = new WindowInteropHelper(window).Handle;
-            
-            // Get the thread IDs
-            uint foregroundThreadId = NativeMethods.GetWindowThreadProcessId(NativeMethods.GetForegroundWindow(), IntPtr.Zero);
-            uint currentThreadId = NativeMethods.GetCurrentThreadId();
-
-            // Attach thread input to ensure SetForegroundWindow works
-            if (foregroundThreadId != currentThreadId)
+            var handle = new WindowInteropHelper(window).Handle;
+            // Get the current foreground window and its thread ID
+            IntPtr foregroundWindow = NativeMethods.GetForegroundWindow();
+            if (foregroundWindow == handle)
             {
-                NativeMethods.AttachThreadInput(currentThreadId, foregroundThreadId, true);
+                window.Activate();
+                return;
+            }
+
+            uint foregroundThreadId = NativeMethods.GetWindowThreadProcessId(foregroundWindow, IntPtr.Zero);
+            uint nativeThreadId = NativeMethods.GetCurrentThreadId();
+
+            if (foregroundThreadId != nativeThreadId && foregroundThreadId != 0)
+            {
+                // Attach our input processing thread to the foreground window's thread
+                NativeMethods.AttachThreadInput(nativeThreadId, foregroundThreadId, true);
+                
+                // Bring to foreground
                 NativeMethods.SetForegroundWindow(handle);
-                NativeMethods.AttachThreadInput(currentThreadId, foregroundThreadId, false);
+                window.Activate();
+                
+                // Detach
+                NativeMethods.AttachThreadInput(nativeThreadId, foregroundThreadId, false);
             }
             else
             {
                 NativeMethods.SetForegroundWindow(handle);
+                window.Activate();
             }
-
-            NativeMethods.BringWindowToTop(handle);
-            NativeMethods.SetFocus(handle);
             
+            // Also try to set focus directly via API
+            NativeMethods.SetFocus(handle);
+            NativeMethods.SetForegroundWindow(handle);
             window.Activate();
         }
 
