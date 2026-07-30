@@ -219,18 +219,18 @@ namespace RunTrackerOverlay.Views
                 _viewModel.WindowTop = this.Top;
             }
 
-            if (msg == NativeMethods.WM_ACTIVATE)
-            {
-                int loword = (int)((long)wParam & 0xFFFF);
-                if (loword == NativeMethods.WA_INACTIVE)
-                {
-                    if (!_viewModel.IsDialogOpen)
-                    {
-                        _viewModel.IsActive = false;
-                        _windowController.SetClickThrough(this, true);
-                    }
-                }
-            }
+            // if (msg == NativeMethods.WM_ACTIVATE)
+            // {
+            //     int loword = (int)((long)wParam & 0xFFFF);
+            //     if (loword == NativeMethods.WA_INACTIVE)
+            //     {
+            //         if (!_viewModel.IsDialogOpen)
+            //         {
+            //             _viewModel.IsActive = false;
+            //             _windowController.SetClickThrough(this, true);
+            //         }
+            //     }
+            // }
 
             return IntPtr.Zero;
         }
