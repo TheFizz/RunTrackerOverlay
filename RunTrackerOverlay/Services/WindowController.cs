@@ -34,8 +34,25 @@ namespace RunTrackerOverlay.Services
         {
             IntPtr handle = new WindowInteropHelper(window).Handle;
             
-            NativeMethods.SetForegroundWindow(handle);
+            // Get the thread IDs
+            uint foregroundThreadId = NativeMethods.GetWindowThreadProcessId(NativeMethods.GetForegroundWindow(), IntPtr.Zero);
+            uint currentThreadId = NativeMethods.GetCurrentThreadId();
+
+            // Attach thread input to ensure SetForegroundWindow works
+            if (foregroundThreadId != currentThreadId)
+            {
+                NativeMethods.AttachThreadInput(currentThreadId, foregroundThreadId, true);
+                NativeMethods.SetForegroundWindow(handle);
+                NativeMethods.AttachThreadInput(currentThreadId, foregroundThreadId, false);
+            }
+            else
+            {
+                NativeMethods.SetForegroundWindow(handle);
+            }
+
             NativeMethods.BringWindowToTop(handle);
+            NativeMethods.SetFocus(handle);
+            
             window.Activate();
         }
 
