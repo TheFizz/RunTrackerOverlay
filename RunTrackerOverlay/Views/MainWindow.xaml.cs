@@ -139,6 +139,7 @@ namespace RunTrackerOverlay.Views
 
             var screen = System.Windows.Forms.Screen.FromHandle(new WindowInteropHelper(this).Handle);
             var area = screen.WorkingArea;
+            var bounds = screen.Bounds;
             int snapDistance = RunTrackerOverlay.Models.Constants.SnapDistance;
 
             bool needsAdjustment = false;
@@ -151,10 +152,20 @@ namespace RunTrackerOverlay.Views
                 newTop = area.Top;
                 needsAdjustment = true;
             }
+            else if (Math.Abs(this.Top - bounds.Top) < snapDistance)
+            {
+                newTop = bounds.Top;
+                needsAdjustment = true;
+            }
             // Check if we were snapped to bottom
             else if (Math.Abs((this.Top + e.PreviousSize.Height) - area.Bottom) < snapDistance)
             {
                 newTop = area.Bottom - e.NewSize.Height;
+                needsAdjustment = true;
+            }
+            else if (Math.Abs((this.Top + e.PreviousSize.Height) - bounds.Bottom) < snapDistance)
+            {
+                newTop = bounds.Bottom - e.NewSize.Height;
                 needsAdjustment = true;
             }
 
@@ -164,10 +175,20 @@ namespace RunTrackerOverlay.Views
                 newLeft = area.Left;
                 needsAdjustment = true;
             }
+            else if (Math.Abs(this.Left - bounds.Left) < snapDistance)
+            {
+                newLeft = bounds.Left;
+                needsAdjustment = true;
+            }
             // Check if we were snapped to right
             else if (Math.Abs((this.Left + e.PreviousSize.Width) - area.Right) < snapDistance)
             {
                 newLeft = area.Right - e.NewSize.Width;
+                needsAdjustment = true;
+            }
+            else if (Math.Abs((this.Left + e.PreviousSize.Width) - bounds.Right) < snapDistance)
+            {
+                newLeft = bounds.Right - e.NewSize.Width;
                 needsAdjustment = true;
             }
 

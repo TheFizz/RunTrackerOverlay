@@ -68,19 +68,31 @@ namespace RunTrackerOverlay.Services
                 
                 var screen = System.Windows.Forms.Screen.FromHandle(hwnd);
                 var area = screen.WorkingArea;
+                var bounds = screen.Bounds; // Full screen area including taskbar
 
                 int width = rect.Right - rect.Left;
                 int height = rect.Bottom - rect.Top;
                 int snapDistance = 20;
 
+                // Horizontal Snapping (Left/Right)
                 if (Math.Abs(virtualLeft - area.Left) < snapDistance)
                 {
                     rect.Left = area.Left;
                     rect.Right = rect.Left + width;
                 }
+                else if (Math.Abs(virtualLeft - bounds.Left) < snapDistance) // True Left
+                {
+                    rect.Left = bounds.Left;
+                    rect.Right = rect.Left + width;
+                }
                 else if (Math.Abs((virtualLeft + width) - area.Right) < snapDistance)
                 {
                     rect.Right = area.Right;
+                    rect.Left = rect.Right - width;
+                }
+                else if (Math.Abs((virtualLeft + width) - bounds.Right) < snapDistance) // True Right
+                {
+                    rect.Right = bounds.Right;
                     rect.Left = rect.Right - width;
                 }
                 else
@@ -89,14 +101,25 @@ namespace RunTrackerOverlay.Services
                     rect.Right = rect.Left + width;
                 }
 
+                // Vertical Snapping (Top/Bottom)
                 if (Math.Abs(virtualTop - area.Top) < snapDistance)
                 {
                     rect.Top = area.Top;
                     rect.Bottom = rect.Top + height;
                 }
+                else if (Math.Abs(virtualTop - bounds.Top) < snapDistance) // True Top
+                {
+                    rect.Top = bounds.Top;
+                    rect.Bottom = rect.Top + height;
+                }
                 else if (Math.Abs((virtualTop + height) - area.Bottom) < snapDistance)
                 {
                     rect.Bottom = area.Bottom;
+                    rect.Top = rect.Bottom - height;
+                }
+                else if (Math.Abs((virtualTop + height) - bounds.Bottom) < snapDistance) // True Bottom
+                {
+                    rect.Bottom = bounds.Bottom;
                     rect.Top = rect.Bottom - height;
                 }
                 else
