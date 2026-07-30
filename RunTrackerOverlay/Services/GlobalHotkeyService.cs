@@ -49,7 +49,6 @@ namespace RunTrackerOverlay.Services
                 if (vkCode == RunStopKey)
                 {
                     OnRunStopPressed?.Invoke();
-                    return (IntPtr)1;
                 }
                 else if (vkCode == FocusKey)
                 {
@@ -59,7 +58,6 @@ namespace RunTrackerOverlay.Services
                 else if (vkCode == ContinuousStopKey)
                 {
                     OnContinuousStopPressed?.Invoke();
-                    return (IntPtr)1;
                 }
                 else if (vkCode == LootKey)
                 {
