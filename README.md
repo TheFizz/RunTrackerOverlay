@@ -25,7 +25,6 @@ The overlay stays out of your way while gaming but remains easily accessible.
 #### Unfocused State (Click-Through Mode)
 When you are playing a game or using another application:
 *   **Click-Through**: The overlay is "transparent" to mouse clicks. You can interact with the game UI behind it without accidental clicks on the tracker.
-*   **Visuals**: The background opacity typically increases (becomes more transparent) to minimize obstruction.
 *   **Global Hotkeys**: The app continues to listen for your hotkeys, allowing full control without leaving your game.
 
 #### How to Focus the App
