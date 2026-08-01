@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Windows.Input;
 
 using RunTrackerOverlay.Models;
@@ -16,6 +17,8 @@ namespace RunTrackerOverlay.ViewModels
         private readonly IReportExporter _reportExporter;
         private readonly ISettingsProvider _settingsProvider;
         private readonly IHotkeyCoordinator _hotkeyCoordinator;
+        private readonly IDisplayService _displayService;
+        private readonly ISessionFileParser _parser;
         private IDialogService _dialogService = null!;
         private string _timerText = "00:00.00";
         private string _runStatusSymbol = "■";
@@ -25,6 +28,7 @@ namespace RunTrackerOverlay.ViewModels
         private string _lastRunTimeText = "00:00.00";
         private string _averageTimeText = "00:00.00";
         private string _totalTimeText = "00:00.00";
+        private string _lootCountText = "0";
         private string _sessionName = "Session 1";
         private string _tooltipText = "";
         private object _timerForeground = "White";
@@ -37,10 +41,9 @@ namespace RunTrackerOverlay.ViewModels
         private bool _showWorst = true;
         private bool _showAvg = true;
         private bool _showTotal = true;
+        private bool _showLoot = true;
         private bool _showSessionName = true;
         private bool _isActive;
-        private bool _hideMilliseconds;
-        private bool _isDirty;
         private bool _isDialogOpen;
         private double _windowLeft;
         private double _windowTop;
@@ -61,6 +64,34 @@ namespace RunTrackerOverlay.ViewModels
         }
 
         public Action? RequestClose { get; set; }
+
+        public void OnClosing()
+        {
+            if (_timerEngine.IsRunning)
+            {
+                _sessionLogger.AppendRun(_timerEngine.RunCount, _timerEngine.CurrentElapsed, _timerEngine.CurrentLoot);
+            }
+            else
+            {
+                // Check if there's a PENDING run in the file that corresponds to current RunCount
+                // Actually, if we just finished a run, the file is updated.
+                // If we added loot but didn't start/stop, it might be PENDING.
+                // The requirement says: "If there is a run that is not conluded but is recorded in the file 
+                // such as when the loot is added on an unfinished run, the app exit should cause this 
+                // unfinished run time to be populated with the current timer value."
+                
+                // If TimerEngine is NOT running, but we have PENDING loot, it's recorded in the file by SessionLogger.AppendActiveRunLoot.
+                // We should probably just call AppendRun with current elapsed (which would be 0 or whatever was there).
+                // But wait, if it's NOT running, CurrentElapsed is what was accumulated.
+                
+                var runs = _sessionLogger.GetSessionRuns().ToList();
+                string pendingPrefix = $"#{_timerEngine.RunCount} PENDING";
+                if (runs.Any(r => r.StartsWith(pendingPrefix)))
+                {
+                    _sessionLogger.AppendRun(_timerEngine.RunCount, _timerEngine.CurrentElapsed, _timerEngine.CurrentLoot);
+                }
+            }
+        }
 
         public ICommand SaveCommand { get; private set; }
         public ICommand ResetCommand { get; private set; }
@@ -88,7 +119,7 @@ namespace RunTrackerOverlay.ViewModels
             }
         }
         
-        public MainViewModel(TimerEngine timerEngine, AppSettings settings, ISessionLogger sessionLogger, IReportExporter reportExporter, ISettingsProvider settingsProvider, IHotkeyCoordinator hotkeyCoordinator)
+        public MainViewModel(TimerEngine timerEngine, AppSettings settings, ISessionLogger sessionLogger, IReportExporter reportExporter, ISettingsProvider settingsProvider, IHotkeyCoordinator hotkeyCoordinator, IDisplayService displayService, ISessionFileParser parser)
         {
             _timerEngine = timerEngine;
             _settings = settings;
@@ -96,22 +127,54 @@ namespace RunTrackerOverlay.ViewModels
             _reportExporter = reportExporter;
             _settingsProvider = settingsProvider;
             _hotkeyCoordinator = hotkeyCoordinator;
+            _displayService = displayService;
+            _parser = parser;
 
             WindowLeft = _settings.WindowLeft;
             WindowTop = _settings.WindowTop;
+
+            if (_sessionLogger.HasSessionFile())
+            {
+                SessionName = _sessionLogger.GetSessionName() ?? "Session 1";
+                var runs = _sessionLogger.GetSessionRuns().ToList();
+                if (runs.Any())
+                {
+                    _statsTracker.LoadFromRuns(runs);
+                    _timerEngine.RestoreState(_statsTracker.MaxRunNumber, _statsTracker.LastRunTime);
+                }
+                else
+                {
+                    SessionName = _sessionLogger.GetSessionName() ?? "Session 1";
+                    _timerEngine.UpdateRunCount(0);
+                }
+            }
+            else
+            {
+                SessionName = "Session 1";
+                _sessionLogger.InitializeSession(SessionName, 0);
+            }
             
-            _timerEngine.StateChanged += () => UpdateDisplay();
+            _timerEngine.StateChanged += () => 
+            {
+                UpdateDisplay();
+            };
             _timerEngine.RunCompleted += (count, duration, loot) =>
             {
                 _statsTracker.AddRun(duration);
                 _sessionLogger.AppendRun(count, duration, loot);
-                IsDirty = true;
                 UpdateDisplay();
             };
             _timerEngine.LootAddedToLastRun += (loot) =>
             {
+                _statsTracker.IncrementLootCount();
                 _sessionLogger.UpdateLastRunLoot(loot);
-                IsDirty = true;
+                UpdateDisplay();
+            };
+
+            _timerEngine.LootAdded += (loot) =>
+            {
+                _statsTracker.IncrementLootCount();
+                _sessionLogger.AppendActiveRunLoot(_timerEngine.RunCount, loot);
                 UpdateDisplay();
             };
 
@@ -133,6 +196,7 @@ namespace RunTrackerOverlay.ViewModels
         public string LastRunTimeText { get => _lastRunTimeText; set => SetProperty(ref _lastRunTimeText, value); }
         public string AverageTimeText { get => _averageTimeText; set => SetProperty(ref _averageTimeText, value); }
         public string TotalTimeText { get => _totalTimeText; set => SetProperty(ref _totalTimeText, value); }
+        public string LootCountText { get => _lootCountText; set => SetProperty(ref _lootCountText, value); }
         public string SessionName 
         { 
             get => _sessionName; 
@@ -210,40 +274,31 @@ namespace RunTrackerOverlay.ViewModels
             } 
         }
 
-        public bool ShowStats => ShowBest || ShowLast || ShowWorst || ShowAvg || ShowTotal;
+        public bool ShowLoot 
+        { 
+            get => _showLoot; 
+            set 
+            { 
+                if (SetProperty(ref _showLoot, value))
+                    OnPropertyChanged(nameof(ShowStats));
+            } 
+        }
+
+        public bool ShowStats => ShowBest || ShowLast || ShowWorst || ShowAvg || ShowTotal || ShowLoot;
 
         public bool IsActive { get => _isActive; set => SetProperty(ref _isActive, value); }
-        public bool IsDirty { get => _isDirty; set => SetProperty(ref _isDirty, value); }
         public bool IsDialogOpen { get => _isDialogOpen; set => SetProperty(ref _isDialogOpen, value); }
-        public bool HideMilliseconds
-        {
-            get => _hideMilliseconds;
-            set
-            {
-                if (SetProperty(ref _hideMilliseconds, value))
-                {
-                    UpdateDisplay();
-                    UpdateTooltip();
-                }
-            }
-        }
 
         // WindowWidth property removed
 
         private void TimerEngine_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == "CurrentLoot" || e.PropertyName == "RunCount" || e.PropertyName == "TotalTime" || e.PropertyName == "LastRunLoot")
-            {
-                IsDirty = true;
-            }
             UpdateDisplay();
         }
 
         public void UpdateVisuals()
         {
-            byte alpha = (byte)(_settings.WindowOpacity * 255);
-            if (alpha == 0) alpha = 1;
-            BackgroundBrush = string.Format("#{0:X2}000000", alpha);
+            BackgroundBrush = _displayService.GetBackgroundBrush(_settings.WindowOpacity);
             TextOpacity = _settings.TextOpacity;
             ShowBest = _settings.ShowBest;
             ShowLast = _settings.ShowLast;
@@ -251,72 +306,50 @@ namespace RunTrackerOverlay.ViewModels
             ShowAvg = _settings.ShowAvg;
             ShowTotal = _settings.ShowTotal;
             ShowSessionName = _settings.ShowSessionName;
-            HideMilliseconds = _settings.HideMilliseconds;
-            SessionName = _settings.SessionName;
         }
 
         public void UpdateTooltip()
         {
-            if (_settings.IsContinuousMode)
-            {
-                TooltipText = $"Run: {_settings.ActivationKey}\nStop: {_settings.PauseKey}\nLoot: {_settings.LootKey}\nFocus: {_settings.FocusKey}";
-            }
-            else
-            {
-                TooltipText = $"Run/Stop: {_settings.ActivationKey}\nLoot: {_settings.LootKey}\nFocus: {_settings.FocusKey}";
-            }
+            TooltipText = _displayService.GetTooltipText(_settings);
             ShowTooltip = _settings.ShowKeysTooltip;
         }
 
         public void UpdateDisplay()
         {
             TimeSpan elapsed = _timerEngine.CurrentElapsed;
-            TimerText = TimeUtils.FormatTime(elapsed, HideMilliseconds);
+            TimerText = _displayService.GetTimerText(elapsed, _settings.TimerFormat);
 
-            if (_timerEngine.IsRunning)
-            {
-                RunStatusSymbol = "▶";
-                RunLabelText = $" Run #{_timerEngine.RunCount}";
-                RunStatusForeground = "Lime";
-                TimerForeground = "Lime";
-            }
-            else
-            {
-                if (_timerEngine.RunCount == 0)
-                {
-                    RunStatusSymbol = "■";
-                    RunLabelText = " Run #1";
-                    RunStatusForeground = "LightSteelBlue";
-                    TimerForeground = "White";
-                }
-                else
-                {
-                    RunStatusSymbol = "✔︎";
-                    RunLabelText = $" Run #{_timerEngine.RunCount}";
-                    RunStatusForeground = "Green";
-                    TimerForeground = "Green";
-                }
-            }
+            RunStatusSymbol = _displayService.GetRunStatusSymbol(_timerEngine.IsRunning, _timerEngine.IsPaused, _timerEngine.RunCount);
+            RunLabelText = _displayService.GetRunLabelText(_timerEngine.IsRunning, _timerEngine.RunCount, _settings.ShowRunCount);
+            RunStatusForeground = _displayService.GetRunStatusForeground(_timerEngine.IsRunning, _timerEngine.IsPaused, _timerEngine.RunCount);
+            TimerForeground = _displayService.GetTimerForeground(_timerEngine.IsRunning, _timerEngine.IsPaused, _timerEngine.RunCount);
 
-            BestTimeText = TimeUtils.FormatTime(_statsTracker.BestTime, HideMilliseconds);
-            WorstTimeText = TimeUtils.FormatTime(_statsTracker.WorstTime, HideMilliseconds);
-            LastRunTimeText = TimeUtils.FormatTime(_timerEngine.LastRunTime, HideMilliseconds);
+            string statsFormat = _settings.ApplyFormatToStats ? _settings.TimerFormat : Constants.TimeFormatStandard;
+
+            BestTimeText = _displayService.GetTimerText(_statsTracker.BestTime, statsFormat);
+            WorstTimeText = _displayService.GetTimerText(_statsTracker.WorstTime, statsFormat);
+            LastRunTimeText = _displayService.GetTimerText(_timerEngine.LastRunTime, statsFormat);
             
-            AverageTimeText = TimeUtils.FormatTime(_statsTracker.RunCount > 0 
+            AverageTimeText = _displayService.GetTimerText(_statsTracker.RunCount > 0 
                 ? TimeSpan.FromTicks(_statsTracker.TotalTime.Ticks / _statsTracker.RunCount) 
-                : TimeSpan.Zero, HideMilliseconds);
-            TotalTimeText = TimeUtils.FormatTime(_statsTracker.TotalTime, HideMilliseconds);
+                : TimeSpan.Zero, statsFormat);
+            TotalTimeText = _displayService.GetTimerText(_statsTracker.TotalTime, statsFormat);
+            LootCountText = _statsTracker.LootCount.ToString();
         }
 
         private void ExecuteReset()
         {
-            if (_dialogService.ShowConfirmationDialog("Are you sure you want to reset the current session? This will clear all loot and times.", "Reset Session") == true)
+            if (_dialogService.ShowConfirmationDialog("Save before resetting?", "Save Confirmation") == true)
             {
-                _timerEngine.Reset();
-                _statsTracker.Reset();
-                _sessionLogger.InitializeSession(SessionName, 0);
-                IsDirty = false;
+                ExecuteSave();
             }
+
+            _timerEngine.Reset();
+            _statsTracker.Reset();
+            _sessionLogger.DeleteSessionFile();
+            SessionName = "Session 1";
+            _sessionLogger.InitializeSession(SessionName, 0);
+            UpdateDisplay();
         }
 
         public Action? SettingsChanged;
@@ -324,20 +357,25 @@ namespace RunTrackerOverlay.ViewModels
         private void ExecuteOptions()
         {
             _hotkeyCoordinator.IsPaused = true;
+            string originalSessionName = SessionName;
             try
             {
-                if (_dialogService.ShowOptionsDialog(_settings, vm => 
+                if (_dialogService.ShowOptionsDialog(_settings, SessionName, vm => 
                     {
+                        if (vm.SessionName != SessionName)
+                        {
+                            SessionName = vm.SessionName;
+                        }
                         vm.ApplyTo(_settings);
-                        _timerEngine.UpdateSettings(_settings.IsContinuousMode);
+                        _timerEngine.UpdateSettings(_settings.Mode);
                         UpdateVisuals();
                         UpdateTooltip();
                         UpdateDisplay();
                         _hotkeyCoordinator.UpdateSettings(_settings);
                     }) == true)
                 {
-                    _timerEngine.UpdateSettings(_settings.IsContinuousMode);
-                    _sessionLogger.InitializeSession(_settings.SessionName, _timerEngine.RunCount);
+                    _sessionLogger.InitializeSession(SessionName, _timerEngine.RunCount);
+                    _timerEngine.UpdateSettings(_settings.Mode);
                     UpdateVisuals();
                     UpdateTooltip();
                     UpdateDisplay();
@@ -346,6 +384,7 @@ namespace RunTrackerOverlay.ViewModels
                 }
                 else
                 {
+                    SessionName = originalSessionName;
                     var loaded = _settingsProvider.LoadSettings();
                     _settings.CopyFrom(loaded);
                     _settings.WindowLeft = WindowLeft;
@@ -392,7 +431,6 @@ namespace RunTrackerOverlay.ViewModels
                                      $"Date: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
 
                     _reportExporter.SaveSessionToFile(filename, header, includeRunsWithoutLoot, _sessionLogger);
-                    IsDirty = false;
                     _dialogService.ShowMessage($"Stats saved to {filename}", "Success");
                 }
             }

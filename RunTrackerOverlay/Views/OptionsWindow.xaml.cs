@@ -12,11 +12,11 @@ namespace RunTrackerOverlay.Views
         private readonly AppSettings _settings;
         public OptionsViewModel ViewModel { get; }
 
-        public OptionsWindow(AppSettings settings)
+        public OptionsWindow(AppSettings settings, string currentSessionName)
         {
             InitializeComponent();
             _settings = settings;
-            ViewModel = new OptionsViewModel(settings);
+            ViewModel = new OptionsViewModel(settings, currentSessionName);
             DataContext = ViewModel;
         }
 
@@ -28,12 +28,17 @@ namespace RunTrackerOverlay.Views
 
         private void KeySelectionButton_Click(object sender, RoutedEventArgs e)
         {
-            ViewModel.StartListeningForActivation();
+            ViewModel.StartListeningForStartStopNext();
         }
 
-        private void PauseKeySelectionButton_Click(object sender, RoutedEventArgs e)
+        private void StopContKeySelectionButton_Click(object sender, RoutedEventArgs e)
         {
-            ViewModel.StartListeningForPause();
+            ViewModel.StartListeningForStopCont();
+        }
+
+        private void PauseResumeKeySelectionButton_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.StartListeningForPauseResume();
         }
 
         private void FocusKeySelectionButton_Click(object sender, RoutedEventArgs e)

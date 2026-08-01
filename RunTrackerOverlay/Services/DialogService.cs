@@ -62,11 +62,11 @@ namespace RunTrackerOverlay.Services
             });
         }
 
-        public bool? ShowOptionsDialog(AppSettings settings, Action<OptionsViewModel> onSettingChanged)
+        public bool? ShowOptionsDialog(AppSettings settings, string currentSessionName, Action<OptionsViewModel> onSettingChanged)
         {
             return ShowDialogWithState(() =>
             {
-                OptionsWindow optionsWin = new OptionsWindow(settings) { Owner = GetActiveWindow() };
+                OptionsWindow optionsWin = new OptionsWindow(settings, currentSessionName) { Owner = GetActiveWindow() };
                 
                 EventHandler<string> handler = (s, e) => onSettingChanged(optionsWin.ViewModel);
                 optionsWin.ViewModel.SettingChanged += handler;

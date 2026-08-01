@@ -7,13 +7,14 @@ namespace RunTrackerOverlay.Models
     {
         public double WindowLeft { get; set; } = 100;
         public double WindowTop { get; set; } = 100;
-        public Key ActivationKey { get; set; } = Key.Pause;
+        public Key StartStopNextKey { get; set; } = Key.F5;
+        public Key StopContKey { get; set; } = Key.F6;
+        public Key PauseResumeKey { get; set; } = Key.F7;
         public Key FocusKey { get; set; } = Key.F8;
-        public Key PauseKey { get; set; } = Key.F9;
-        public Key LootKey { get; set; } = Key.PageUp;
+        public Key LootKey { get; set; } = Key.F9;
         public bool ShowKeysTooltip { get; set; } = true;
         public bool IsSnappingEnabled { get; set; } = true;
-        public bool IsContinuousMode { get; set; } = false;
+        public TrackerMode Mode { get; set; } = TrackerMode.Continuous;
         public double WindowOpacity { get; set; } = 0.5;
         public double TextOpacity { get; set; } = 1.0;
         public bool ShowBest { get; set; } = true;
@@ -21,21 +22,24 @@ namespace RunTrackerOverlay.Models
         public bool ShowWorst { get; set; } = true;
         public bool ShowAvg { get; set; } = true;
         public bool ShowTotal { get; set; } = true;
-        public bool HideMilliseconds { get; set; } = false;
-        public string SessionName { get; set; } = "Session 1";
+        public bool ShowLoot { get; set; } = true;
+        public string TimerFormat { get; set; } = Constants.TimeFormatStandard;
+        public bool ApplyFormatToStats { get; set; } = false;
         public bool ShowSessionName { get; set; } = true;
+        public bool ShowRunCount { get; set; } = true;
 
         public void CopyFrom(AppSettings other)
         {
             this.WindowLeft = other.WindowLeft;
             this.WindowTop = other.WindowTop;
-            this.ActivationKey = other.ActivationKey;
+            this.StartStopNextKey = other.StartStopNextKey;
             this.FocusKey = other.FocusKey;
-            this.PauseKey = other.PauseKey;
+            this.StopContKey = other.StopContKey;
+            this.PauseResumeKey = other.PauseResumeKey;
             this.LootKey = other.LootKey;
             this.ShowKeysTooltip = other.ShowKeysTooltip;
             this.IsSnappingEnabled = other.IsSnappingEnabled;
-            this.IsContinuousMode = other.IsContinuousMode;
+            this.Mode = other.Mode;
             this.WindowOpacity = other.WindowOpacity;
             this.TextOpacity = other.TextOpacity;
             this.ShowBest = other.ShowBest;
@@ -43,9 +47,11 @@ namespace RunTrackerOverlay.Models
             this.ShowWorst = other.ShowWorst;
             this.ShowAvg = other.ShowAvg;
             this.ShowTotal = other.ShowTotal;
-            this.HideMilliseconds = other.HideMilliseconds;
-            this.SessionName = other.SessionName;
+            this.ShowLoot = other.ShowLoot;
+            this.TimerFormat = other.TimerFormat;
+            this.ApplyFormatToStats = other.ApplyFormatToStats;
             this.ShowSessionName = other.ShowSessionName;
+            this.ShowRunCount = other.ShowRunCount;
         }
     }
 }

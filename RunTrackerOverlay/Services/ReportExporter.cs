@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Text;
 
 namespace RunTrackerOverlay.Services
 {
@@ -12,7 +13,9 @@ namespace RunTrackerOverlay.Services
     {
         public void SaveSessionToFile(string filename, string header, bool includeRunsWithoutLoot, ISessionLogger sessionLogger)
         {
-            string content = header + Environment.NewLine + Environment.NewLine;
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine(header);
+            sb.AppendLine();
             
             var runs = sessionLogger.GetSessionRuns();
             foreach (var line in runs)
@@ -25,10 +28,10 @@ namespace RunTrackerOverlay.Services
                         continue;
                     }
                 }
-                content += line + Environment.NewLine;
+                sb.AppendLine(line);
             }
 
-            File.WriteAllText(filename, content);
+            File.WriteAllText(filename, sb.ToString());
         }
     }
 }

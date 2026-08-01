@@ -1,63 +1,84 @@
 ﻿using System;
 using System.Windows.Input;
-
 using RunTrackerOverlay.Models;
+using RunTrackerOverlay.Services;
 
 namespace RunTrackerOverlay.ViewModels
 {
     public class OptionsViewModel : ViewModelBase
     {
+        private string _sessionName = "";
         private bool _isSnappingEnabled;
         private bool _showKeysTooltip;
-        private bool _isContinuousMode;
+        private TrackerMode _mode;
         private bool _showBest;
         private bool _showLast;
         private bool _showWorst;
         private bool _showAvg;
         private bool _showTotal;
+        private bool _showLoot;
         private bool _showSessionName;
-        private bool _hideMilliseconds;
-        private string _sessionName = "";
+        private bool _showRunCount;
+        private string _timerFormat = "";
+        private bool _isTimerFormatInvalid;
+        private bool _applyFormatToStats;
         private double _windowOpacity;
         private double _textOpacity;
-        private Key _activationKey;
+        private Key _startStopNextKey;
         private Key _focusKey;
-        private Key _pauseKey;
+        private Key _stopContKey;
+        private Key _pauseResumeKey;
         private Key _lootKey;
 
-        private bool _isListeningForActivationKey;
+        private bool _isListeningForStartStopNextKey;
         private bool _isListeningForFocusKey;
-        private bool _isListeningForPauseKey;
+        private bool _isListeningForStopContKey;
+        private bool _isListeningForPauseResumeKey;
         private bool _isListeningForLootKey;
 
-        private string _activationKeyText = "";
+        private string _startStopNextKeyText = "";
         private string _focusKeyText = "";
-        private string _pauseKeyText = "";
+        private string _stopContKeyText = "";
+        private string _pauseResumeKeyText = "";
         private string _lootKeyText = "";
 
-        public OptionsViewModel(AppSettings settings)
+        public OptionsViewModel(AppSettings settings, string currentSessionName)
         {
+            SessionName = currentSessionName;
             IsSnappingEnabled = settings.IsSnappingEnabled;
             ShowKeysTooltip = settings.ShowKeysTooltip;
-            IsContinuousMode = settings.IsContinuousMode;
+            Mode = settings.Mode;
             ShowBest = settings.ShowBest;
             ShowLast = settings.ShowLast;
             ShowWorst = settings.ShowWorst;
             ShowAvg = settings.ShowAvg;
             ShowTotal = settings.ShowTotal;
+            ShowLoot = settings.ShowLoot;
             ShowSessionName = settings.ShowSessionName;
-            HideMilliseconds = settings.HideMilliseconds;
-            SessionName = settings.SessionName;
+            ShowRunCount = settings.ShowRunCount;
+            TimerFormat = settings.TimerFormat;
+            _isTimerFormatInvalid = !TimeUtils.IsValidFormat(TimerFormat);
+            ApplyFormatToStats = settings.ApplyFormatToStats;
             WindowOpacity = settings.WindowOpacity;
             TextOpacity = settings.TextOpacity;
-            ActivationKey = settings.ActivationKey;
+            StartStopNextKey = settings.StartStopNextKey;
             FocusKey = settings.FocusKey;
-            PauseKey = settings.PauseKey;
+            StopContKey = settings.StopContKey;
+            PauseResumeKey = settings.PauseResumeKey;
             LootKey = settings.LootKey;
 
             UpdateKeyTexts();
         }
 
+        public string SessionName
+        {
+            get => _sessionName;
+            set
+            {
+                if (SetProperty(ref _sessionName, value))
+                    SettingChanged?.Invoke(this, nameof(SessionName));
+            }
+        }
         public bool IsSnappingEnabled 
         { 
             get => _isSnappingEnabled; 
@@ -76,15 +97,18 @@ namespace RunTrackerOverlay.ViewModels
                     SettingChanged?.Invoke(this, nameof(ShowKeysTooltip));
             } 
         }
-        public bool IsContinuousMode 
+        public TrackerMode Mode 
         { 
-            get => _isContinuousMode; 
+            get => _mode; 
             set 
             {
-                if (SetProperty(ref _isContinuousMode, value))
-                    SettingChanged?.Invoke(this, nameof(IsContinuousMode));
+                if (SetProperty(ref _mode, value))
+                    SettingChanged?.Invoke(this, nameof(Mode));
             } 
         }
+
+        public TrackerMode[] AllModes => (TrackerMode[])Enum.GetValues(typeof(TrackerMode));
+
         public bool ShowBest 
         { 
             get => _showBest; 
@@ -130,6 +154,15 @@ namespace RunTrackerOverlay.ViewModels
                     SettingChanged?.Invoke(this, nameof(ShowTotal));
             } 
         }
+        public bool ShowLoot 
+        { 
+            get => _showLoot; 
+            set 
+            {
+                if (SetProperty(ref _showLoot, value))
+                    SettingChanged?.Invoke(this, nameof(ShowLoot));
+            } 
+        }
         public bool ShowSessionName 
         { 
             get => _showSessionName; 
@@ -139,22 +172,39 @@ namespace RunTrackerOverlay.ViewModels
                     SettingChanged?.Invoke(this, nameof(ShowSessionName));
             } 
         }
-        public bool HideMilliseconds 
+        public bool ShowRunCount 
         { 
-            get => _hideMilliseconds; 
+            get => _showRunCount; 
             set 
             {
-                if (SetProperty(ref _hideMilliseconds, value))
-                    SettingChanged?.Invoke(this, nameof(HideMilliseconds));
+                if (SetProperty(ref _showRunCount, value))
+                    SettingChanged?.Invoke(this, nameof(ShowRunCount));
+            } 
+        }
+        public string TimerFormat 
+        { 
+            get => _timerFormat; 
+            set 
+            {
+                if (SetProperty(ref _timerFormat, value))
+                {
+                    IsTimerFormatInvalid = !TimeUtils.IsValidFormat(value);
+                    SettingChanged?.Invoke(this, nameof(TimerFormat));
+                }
             }
         }
-        public string SessionName 
+        public bool IsTimerFormatInvalid
+        {
+            get => _isTimerFormatInvalid;
+            private set => SetProperty(ref _isTimerFormatInvalid, value);
+        }
+        public bool ApplyFormatToStats 
         { 
-            get => _sessionName; 
+            get => _applyFormatToStats; 
             set 
             {
-                if (SetProperty(ref _sessionName, value))
-                    SettingChanged?.Invoke(this, nameof(SessionName));
+                if (SetProperty(ref _applyFormatToStats, value))
+                    SettingChanged?.Invoke(this, nameof(ApplyFormatToStats));
             }
         }
         public double WindowOpacity 
@@ -175,45 +225,50 @@ namespace RunTrackerOverlay.ViewModels
                     SettingChanged?.Invoke(this, nameof(TextOpacity));
             }
         }
-        public Key ActivationKey { get => _activationKey; set { _activationKey = value; UpdateKeyTexts(); SettingChanged?.Invoke(this, nameof(ActivationKey)); } }
+        public Key StartStopNextKey { get => _startStopNextKey; set { _startStopNextKey = value; UpdateKeyTexts(); SettingChanged?.Invoke(this, nameof(StartStopNextKey)); } }
         public Key FocusKey { get => _focusKey; set { _focusKey = value; UpdateKeyTexts(); SettingChanged?.Invoke(this, nameof(FocusKey)); } }
-        public Key PauseKey { get => _pauseKey; set { _pauseKey = value; UpdateKeyTexts(); SettingChanged?.Invoke(this, nameof(PauseKey)); } }
+        public Key StopContKey { get => _stopContKey; set { _stopContKey = value; UpdateKeyTexts(); SettingChanged?.Invoke(this, nameof(StopContKey)); } }
+        public Key PauseResumeKey { get => _pauseResumeKey; set { _pauseResumeKey = value; UpdateKeyTexts(); SettingChanged?.Invoke(this, nameof(PauseResumeKey)); } }
         public Key LootKey { get => _lootKey; set { _lootKey = value; UpdateKeyTexts(); SettingChanged?.Invoke(this, nameof(LootKey)); } }
 
-        public string ActivationKeyText { get => _activationKeyText; private set => SetProperty(ref _activationKeyText, value); }
+        public string StartStopNextKeyText { get => _startStopNextKeyText; private set => SetProperty(ref _startStopNextKeyText, value); }
         public string FocusKeyText { get => _focusKeyText; private set => SetProperty(ref _focusKeyText, value); }
-        public string PauseKeyText { get => _pauseKeyText; private set => SetProperty(ref _pauseKeyText, value); }
+        public string StopContKeyText { get => _stopContKeyText; private set => SetProperty(ref _stopContKeyText, value); }
+        public string PauseResumeKeyText { get => _pauseResumeKeyText; private set => SetProperty(ref _pauseResumeKeyText, value); }
         public string LootKeyText { get => _lootKeyText; private set => SetProperty(ref _lootKeyText, value); }
 
         public event EventHandler<string>? SettingChanged;
         
         private void UpdateKeyTexts()
         {
-            ActivationKeyText = _isListeningForActivationKey ? "Press any key..." : ActivationKey.ToString();
+            StartStopNextKeyText = _isListeningForStartStopNextKey ? "Press any key..." : StartStopNextKey.ToString();
             FocusKeyText = _isListeningForFocusKey ? "Press any key..." : FocusKey.ToString();
-            PauseKeyText = _isListeningForPauseKey ? "Press any key..." : PauseKey.ToString();
+            StopContKeyText = _isListeningForStopContKey ? "Press any key..." : StopContKey.ToString();
+            PauseResumeKeyText = _isListeningForPauseResumeKey ? "Press any key..." : PauseResumeKey.ToString();
             LootKeyText = _isListeningForLootKey ? "Press any key..." : LootKey.ToString();
         }
 
-        public void StartListeningForActivation() { ResetListening(); _isListeningForActivationKey = true; UpdateKeyTexts(); }
+        public void StartListeningForStartStopNext() { ResetListening(); _isListeningForStartStopNextKey = true; UpdateKeyTexts(); }
         public void StartListeningForFocus() { ResetListening(); _isListeningForFocusKey = true; UpdateKeyTexts(); }
-        public void StartListeningForPause() { ResetListening(); _isListeningForPauseKey = true; UpdateKeyTexts(); }
+        public void StartListeningForStopCont() { ResetListening(); _isListeningForStopContKey = true; UpdateKeyTexts(); }
+        public void StartListeningForPauseResume() { ResetListening(); _isListeningForPauseResumeKey = true; UpdateKeyTexts(); }
         public void StartListeningForLoot() { ResetListening(); _isListeningForLootKey = true; UpdateKeyTexts(); }
 
         private void ResetListening()
         {
-            _isListeningForActivationKey = false;
+            _isListeningForStartStopNextKey = false;
             _isListeningForFocusKey = false;
-            _isListeningForPauseKey = false;
+            _isListeningForStopContKey = false;
+            _isListeningForPauseResumeKey = false;
             _isListeningForLootKey = false;
         }
 
         public bool HandleKeyDown(Key key)
         {
-            if (_isListeningForActivationKey)
+            if (_isListeningForStartStopNextKey)
             {
-                ActivationKey = key;
-                _isListeningForActivationKey = false;
+                StartStopNextKey = key;
+                _isListeningForStartStopNextKey = false;
                 UpdateKeyTexts();
                 return true;
             }
@@ -224,10 +279,17 @@ namespace RunTrackerOverlay.ViewModels
                 UpdateKeyTexts();
                 return true;
             }
-            if (_isListeningForPauseKey)
+            if (_isListeningForStopContKey)
             {
-                PauseKey = key;
-                _isListeningForPauseKey = false;
+                StopContKey = key;
+                _isListeningForStopContKey = false;
+                UpdateKeyTexts();
+                return true;
+            }
+            if (_isListeningForPauseResumeKey)
+            {
+                PauseResumeKey = key;
+                _isListeningForPauseResumeKey = false;
                 UpdateKeyTexts();
                 return true;
             }
@@ -245,20 +307,23 @@ namespace RunTrackerOverlay.ViewModels
         {
             settings.IsSnappingEnabled = IsSnappingEnabled;
             settings.ShowKeysTooltip = ShowKeysTooltip;
-            settings.IsContinuousMode = IsContinuousMode;
+            settings.Mode = Mode;
             settings.ShowBest = ShowBest;
             settings.ShowLast = ShowLast;
             settings.ShowWorst = ShowWorst;
             settings.ShowAvg = ShowAvg;
             settings.ShowTotal = ShowTotal;
+            settings.ShowLoot = ShowLoot;
             settings.ShowSessionName = ShowSessionName;
-            settings.HideMilliseconds = HideMilliseconds;
-            settings.SessionName = SessionName;
+            settings.ShowRunCount = ShowRunCount;
+            settings.TimerFormat = TimerFormat;
+            settings.ApplyFormatToStats = ApplyFormatToStats;
             settings.WindowOpacity = WindowOpacity;
             settings.TextOpacity = TextOpacity;
-            settings.ActivationKey = ActivationKey;
+            settings.StartStopNextKey = StartStopNextKey;
             settings.FocusKey = FocusKey;
-            settings.PauseKey = PauseKey;
+            settings.StopContKey = StopContKey;
+            settings.PauseResumeKey = PauseResumeKey;
             settings.LootKey = LootKey;
         }
     }

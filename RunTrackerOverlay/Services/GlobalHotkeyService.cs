@@ -12,11 +12,13 @@ namespace RunTrackerOverlay.Services
         public event Action? OnRunStopPressed;
         public event Action? OnFocusPressed;
         public event Action? OnContinuousStopPressed;
+        public event Action? OnPauseResumePressed;
         public event Action? OnLootPressed;
 
         public uint RunStopKey { get; set; }
         public uint FocusKey { get; set; }
         public uint ContinuousStopKey { get; set; }
+        public uint PauseResumeKey { get; set; }
         public uint LootKey { get; set; }
         public bool IsPaused { get; set; }
 
@@ -58,6 +60,10 @@ namespace RunTrackerOverlay.Services
                 else if (vkCode == ContinuousStopKey)
                 {
                     OnContinuousStopPressed?.Invoke();
+                }
+                else if (vkCode == PauseResumeKey)
+                {
+                    OnPauseResumePressed?.Invoke();
                 }
                 else if (vkCode == LootKey)
                 {

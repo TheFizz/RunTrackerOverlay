@@ -111,8 +111,6 @@ namespace RunTrackerOverlay.Views
                 _displayTimer.Stop();
                 _displayTimer = null;
             }
-
-            _sessionLogger.DeleteSessionFile();
         }
 
 
@@ -124,13 +122,7 @@ namespace RunTrackerOverlay.Views
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (_viewModel.IsDirty)
-            {
-                if (_viewModel.DialogService.ShowConfirmationDialog("You have unsaved changes. Quit anyway?", "Quit Without Saving") != true)
-                {
-                    e.Cancel = true;
-                }
-            }
+            _viewModel.OnClosing();
         }
 
         private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)

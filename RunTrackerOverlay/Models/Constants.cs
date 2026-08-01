@@ -9,7 +9,5 @@ namespace RunTrackerOverlay.Models
         public const string TimeFormatNoMs = @"mm\:ss";
         public const string TimeLimitTextStandard = "99:59.99";
         public const string TimeLimitTextNoMs = "99:59";
-        public const string ZeroTimeTextStandard = "00:00.00";
-        public const string ZeroTimeTextNoMs = "00:00";
     }
 }

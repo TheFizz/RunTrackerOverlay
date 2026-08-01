@@ -41,6 +41,7 @@ namespace RunTrackerOverlay.Services
             _hotkeyService.OnRunStopPressed += () => _timerEngine.HandlePause();
             _hotkeyService.OnFocusPressed += () => _onFocusPressed?.Invoke();
             _hotkeyService.OnContinuousStopPressed += () => _timerEngine.HandleContinuousStop();
+            _hotkeyService.OnPauseResumePressed += () => _timerEngine.PauseResume();
             _hotkeyService.OnLootPressed += () => _showLootDialog?.Invoke();
 
             UpdateSettings(settings);
@@ -48,9 +49,10 @@ namespace RunTrackerOverlay.Services
 
         public void UpdateSettings(AppSettings settings)
         {
-            _hotkeyService.RunStopKey = (uint)KeyInterop.VirtualKeyFromKey(settings.ActivationKey);
+            _hotkeyService.RunStopKey = (uint)KeyInterop.VirtualKeyFromKey(settings.StartStopNextKey);
             _hotkeyService.FocusKey = (uint)KeyInterop.VirtualKeyFromKey(settings.FocusKey);
-            _hotkeyService.ContinuousStopKey = (uint)KeyInterop.VirtualKeyFromKey(settings.PauseKey);
+            _hotkeyService.ContinuousStopKey = (uint)KeyInterop.VirtualKeyFromKey(settings.StopContKey);
+            _hotkeyService.PauseResumeKey = (uint)KeyInterop.VirtualKeyFromKey(settings.PauseResumeKey);
             _hotkeyService.LootKey = (uint)KeyInterop.VirtualKeyFromKey(settings.LootKey);
         }
 

@@ -21,17 +21,26 @@ namespace RunTrackerOverlay.Views
         {
             base.OnStartup(e);
 
-            ISessionLogger sessionLogger = new SessionLogger();
+            ISessionFileParser sessionFileParser = new SessionFileParser();
+            ISessionLogger sessionLogger = new SessionLogger(sessionFileParser);
             ISettingsProvider settingsProvider = new FileSettingsProvider();
             IReportExporter reportExporter = new FileReportExporter();
             IWindowController windowController = new WindowController();
             IHotkeyCoordinator hotkeyCoordinator = new HotkeyCoordinator();
+            IDisplayService displayService = new DisplayService();
 
             AppSettings settings = settingsProvider.LoadSettings();
-            TimerEngine timerEngine = new TimerEngine(settings.IsContinuousMode);
-            sessionLogger.InitializeSession(settings.SessionName, 0);
+            TimerEngine timerEngine = new TimerEngine(settings.Mode);
 
-            RunTrackerOverlay.ViewModels.MainViewModel viewModel = new RunTrackerOverlay.ViewModels.MainViewModel(timerEngine, settings, sessionLogger, reportExporter, settingsProvider, hotkeyCoordinator);
+            RunTrackerOverlay.ViewModels.MainViewModel viewModel = new RunTrackerOverlay.ViewModels.MainViewModel(
+                timerEngine, 
+                settings, 
+                sessionLogger, 
+                reportExporter, 
+                settingsProvider, 
+                hotkeyCoordinator,
+                displayService,
+                sessionFileParser);
             IDialogService dialogService = new DialogService(viewModel, windowController);
             viewModel.DialogService = dialogService;
 

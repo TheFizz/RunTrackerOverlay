@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using RunTrackerOverlay.Models;
 
 namespace RunTrackerOverlay.Services
 {
@@ -9,33 +10,38 @@ namespace RunTrackerOverlay.Services
     {
         void InitializeSession(string sessionName, int runCount);
         void AppendRun(int runCount, TimeSpan duration, string loot);
+        void AppendActiveRunLoot(int runCount, string loot);
         void UpdateLastRunLoot(string loot);
         void DeleteSessionFile();
         IEnumerable<string> GetSessionRuns();
+        string? GetSessionName();
+        bool HasSessionFile();
     }
 
     public class SessionLogger : ISessionLogger
     {
         private const string SessionFileName = "currentSession.txt";
+        private readonly ISessionFileParser _parser;
+
+        public SessionLogger(ISessionFileParser parser)
+        {
+            _parser = parser;
+        }
 
         public void InitializeSession(string sessionName, int runCount)
         {
             try
             {
-                if (runCount > 0 && File.Exists(SessionFileName))
+                if (File.Exists(SessionFileName))
                 {
-                    var existingLines = File.ReadAllLines(SessionFileName);
-                    if (existingLines.Length > 1)
-                    {
-                        var newLines = new List<string>();
-                        newLines.Add(sessionName ?? string.Empty);
-                        for (int i = 1; i < existingLines.Length; i++)
-                        {
-                            newLines.Add(existingLines[i]);
-                        }
-                        File.WriteAllLines(SessionFileName, newLines);
-                        return;
-                    }
+                    var lines = File.ReadAllLines(SessionFileName);
+                    var data = _parser.Parse(lines);
+                    data.SessionName = sessionName ?? string.Empty;
+
+                    var newLines = new List<string> { data.SessionName };
+                    newLines.AddRange(lines.Skip(1));
+                    File.WriteAllLines(SessionFileName, newLines);
+                    return;
                 }
 
                 File.WriteAllLines(SessionFileName, new[] { sessionName ?? string.Empty });
@@ -47,9 +53,67 @@ namespace RunTrackerOverlay.Services
         {
             try
             {
-                string timeStr = duration.TotalDays >= 1 ? "99:59.99" : duration.ToString(@"mm\:ss\.ff");
-                string lootStr = !string.IsNullOrEmpty(loot) ? $" {loot}" : "";
-                File.AppendAllText(SessionFileName, $"#{runCount} {timeStr}{lootStr}{Environment.NewLine}");
+                if (File.Exists(SessionFileName))
+                {
+                    var lines = File.ReadAllLines(SessionFileName);
+                    var data = _parser.Parse(lines);
+                    data.Runs.RemoveAll(r => r.RunNumber == runCount && r.IsPending);
+
+                    var newLines = new List<string> { data.SessionName ?? string.Empty };
+                    foreach (var r in data.Runs)
+                    {
+                        newLines.Add(_parser.FormatRun(r));
+                    }
+                    File.WriteAllLines(SessionFileName, newLines);
+                }
+
+                var newRun = new SessionRun
+                {
+                    RunNumber = runCount,
+                    Duration = duration,
+                    IsPending = false
+                };
+                if (!string.IsNullOrEmpty(loot))
+                {
+                    newRun.Loot.AddRange(loot.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)));
+                }
+
+                File.AppendAllText(SessionFileName, _parser.FormatRun(newRun) + Environment.NewLine);
+            }
+            catch { }
+        }
+
+        public void AppendActiveRunLoot(int runCount, string loot)
+        {
+            try
+            {
+                if (!File.Exists(SessionFileName)) return;
+
+                var lines = File.ReadAllLines(SessionFileName);
+                var data = _parser.Parse(lines);
+                var run = data.Runs.LastOrDefault(r => r.RunNumber == runCount && r.IsPending);
+
+                if (run != null)
+                {
+                    run.Loot.AddRange(loot.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)));
+                }
+                else
+                {
+                    run = new SessionRun
+                    {
+                        RunNumber = runCount,
+                        IsPending = true
+                    };
+                    run.Loot.AddRange(loot.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)));
+                    data.Runs.Add(run);
+                }
+
+                var newLines = new List<string> { data.SessionName ?? string.Empty };
+                foreach (var r in data.Runs)
+                {
+                    newLines.Add(_parser.FormatRun(r));
+                }
+                File.WriteAllLines(SessionFileName, newLines);
             }
             catch { }
         }
@@ -60,23 +124,19 @@ namespace RunTrackerOverlay.Services
             {
                 if (!File.Exists(SessionFileName)) return;
 
-                var lines = File.ReadAllLines(SessionFileName).ToList();
-                if (lines.Count <= 1) return;
+                var lines = File.ReadAllLines(SessionFileName);
+                var data = _parser.Parse(lines);
+                if (data.Runs.Count == 0) return;
 
-                string lastLine = lines[lines.Count - 1];
-                string[] parts = lastLine.Split(' ', 3);
-                
-                if (parts.Length == 3)
-                {
-                    lastLine = $"{parts[0]} {parts[1]} {parts[2]}, {loot}";
-                }
-                else if (parts.Length == 2)
-                {
-                    lastLine = $"{parts[0]} {parts[1]} {loot}";
-                }
+                var lastRun = data.Runs.Last();
+                lastRun.Loot.AddRange(loot.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)));
 
-                lines[lines.Count - 1] = lastLine;
-                File.WriteAllLines(SessionFileName, lines);
+                var newLines = new List<string> { data.SessionName ?? string.Empty };
+                foreach (var r in data.Runs)
+                {
+                    newLines.Add(_parser.FormatRun(r));
+                }
+                File.WriteAllLines(SessionFileName, newLines);
             }
             catch { }
         }
@@ -104,6 +164,28 @@ namespace RunTrackerOverlay.Services
             }
             catch { }
             return Enumerable.Empty<string>();
+        }
+
+        public string? GetSessionName()
+        {
+            try
+            {
+                if (File.Exists(SessionFileName))
+                {
+                    var lines = File.ReadAllLines(SessionFileName);
+                    if (lines.Length > 0)
+                    {
+                        return lines[0];
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public bool HasSessionFile()
+        {
+            return File.Exists(SessionFileName);
         }
     }
 }
